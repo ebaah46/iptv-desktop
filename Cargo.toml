@@ -1,0 +1,7 @@
+[package]
+name = "iptv_desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+core = {git = "https://github.com/ebaah46/iptv-core"}
