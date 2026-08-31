@@ -1,0 +1,146 @@
+import { Theme } from "../theme.slint";
+import { VerticalBox, LineEdit } from "std-widgets.slint";
+
+export component TopBar {
+    in-out property <string> active_tab: "Home";
+    in-out property <string> search_query: "";
+
+    callback tab_changed(string);
+    callback search_changed(string);
+
+    width: 100%;
+    height: Theme.topbar_height;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.topbar_bg;
+
+        HorizontalLayout {
+            spacing: 0;
+            padding-top: 10px;
+
+            // Logo area - natural width, no stretch
+            HorizontalLayout {
+                padding-left: Theme.spacing_lg;
+                spacing: Theme.spacing_sm;
+                alignment: center;
+
+                Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    background: Theme.gradient_accent;
+                    border-radius: Theme.radius_sm;
+                }
+                VerticalBox{
+                    padding-top: Theme.spacing_sm;
+                    padding-left: 0px;
+                    Text {
+                        text: "IPTV";
+                        color: Theme.text_primary;
+                        font-size: Theme.font_size_lg;
+                        font-weight: 700;
+                        stroke-style: outside;
+                    }
+                }
+            }
+
+            // Navigation tabs - stretches to fill all available space
+            HorizontalLayout {
+                alignment: center;
+                spacing: Theme.spacing_xs;
+
+                for tab in ["Home", "Guide", "Movies", "Series", "Recordings"] : Rectangle {
+                    min-width: 60px;
+                    height: 36px;
+                    background: tab == active_tab ? Theme.primary : transparent;
+                    border-radius: Theme.radius_sm;
+
+                    Text {
+                        text: tab;
+                        color: tab == active_tab ? #ffffff : Theme.text_secondary;
+                        font-size: Theme.font_size_md;
+                        font-weight: tab == active_tab ? 600 : 400;
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            active_tab = tab;
+                            tab_changed(tab);
+                        }
+                    }
+                }
+            }
+
+            // Search + settings area - natural width, anchored to right
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.spacing_sm;
+                padding-right: Theme.spacing_lg;
+                padding-left: Theme.spacing_sm;
+
+                Rectangle {
+                    // 1. Tell the parent layout to expand this outer Rectangle
+                    horizontal-stretch: 1;
+                    preferred-width: 300px; // Default target width
+                    min-width: 150px;       // Won't shrink past this point
+                    max-width: 600px;       // Optional: caps how wide it can get on large screens
+                    height: 32px;
+
+                    // background: Theme.surface;
+                    border-radius: Theme.radius_md;
+                    border-width: 1px;
+
+                    HorizontalLayout {
+                        padding-left: Theme.spacing_sm;
+                        padding-right: Theme.spacing_sm;
+                        spacing: Theme.spacing_sm;
+
+                        // Search icon stays fixed size on the left
+                        Text {
+                            text: "🔍";
+                            font-size: Theme.icon_size;
+                            horizontal-stretch: 0; // Don't allow icon space to expand
+                            vertical-alignment: center;
+                        }
+
+                        // 2. LineEdit expands to fill all remaining horizontal space inside the bar
+                        LineEdit {
+                            horizontal-stretch: 1;
+                            text: search_query;
+                            font-size: Theme.font_size_md;
+                            opacity: 0.6;
+                            input-type: search;
+                            placeholder-text: "Enter channel search here...";
+
+                            edited => {
+                                search_query = self.text;
+                                search_changed(self.text);
+                            }
+                        }
+                    }
+                }
+
+
+
+                // Settings icon
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: Theme.radius_sm;
+
+                    Text {
+                        text: "⚙️";
+                        font-size: Theme.icon_size;
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            // Settings action placeholder
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
