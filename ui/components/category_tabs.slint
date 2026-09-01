@@ -1,0 +1,44 @@
+import { Theme } from "../theme.slint";
+
+export component CategoryTabs {
+    in property <[string]> categories;
+    in-out property <string> active_category: "All";
+    callback category_changed(string);
+
+    width: 100%;
+    height: 40px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        HorizontalLayout {
+            padding-left: Theme.spacing_lg;
+            spacing: Theme.spacing_sm;
+            alignment: center;
+
+            for category in categories : Rectangle {
+                width: 100px;
+                height: 32px;
+                background: category == active_category ? Theme.accent : Theme.surface;
+                border-radius: Theme.radius_md;
+                border-width: 1px;
+                border-color: category == active_category ? Theme.accent : Theme.border_color;
+
+                Text {
+                    text: category;
+                    color: category == active_category ? #ffffff : Theme.text_secondary;
+                    font-size: Theme.font_size_sm;
+                    font-weight: category == active_category ? 600 : 400;
+                }
+
+                TouchArea {
+                    clicked => {
+                        active_category = category;
+                        category_changed(category);
+                    }
+                }
+            }
+        }
+    }
+}
