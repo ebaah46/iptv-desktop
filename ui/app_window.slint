@@ -1,11 +1,14 @@
-export component MainWindow inherits Window {
-    width: 800px;
-    height: 680px;
-    title: "Slint macOS App";
+import { HomeScreen } from "screens/home_screen.slint";
 
-    Text {
-        text: "Hello from Slint on macOS!";
-        color: #1a73e8;
-        font-size: 16px;
+export component MainWindow inherits Window {
+    width: 1024px;
+    height: 720px;
+    title: "IPTV Desktop";
+
+    background: #13131a;
+
+    HomeScreen {
+        width: 100%;
+        height: 100%;
     }
 }
