@@ -1,0 +1,190 @@
+import { Theme } from "../theme.slint";
+
+export component StatusBar {
+    in property <string> now_playing: "Nothing playing";
+    in property <bool> has_content: false;
+    
+    // Metadata properties
+    in property <string> app_version: "";
+    in property <string> core_version: "";
+    in property <int> channel_count: 0;
+    in property <string> stream_quality: "";
+    in property <string> connection_status: "";
+
+    width: 100%;
+    height: Theme.statusbar_height;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.statusbar_bg;
+        border-width: 0px;
+        border-color: Theme.border_color;
+
+        // VerticalLayout with alignment: center ensures the row is vertically centered
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                padding-left: Theme.spacing_lg;
+                padding-right: Theme.spacing_lg;
+                spacing: Theme.spacing_md;
+
+                // ========== Left Section: Now Playing ==========
+                HorizontalLayout {
+                    spacing: Theme.spacing_sm;
+                    alignment: center;
+
+                    // Status dot
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: has_content ? Theme.success : Theme.text_secondary;
+                    }
+
+                    // "Now Playing" / "Standby" label
+                    Text {
+                        text: has_content ? "Now Playing:" : "Standby";
+                        color: Theme.text_secondary;
+                        font-size: Theme.font_size_sm;
+                        font-weight: 600;
+                    }
+
+                    // Program name
+                    Text {
+                        text: now_playing;
+                        color: Theme.text_primary;
+                        font-size: Theme.font_size_md;
+                        font-weight: 500;
+                        overflow: elide;
+                    }
+                }
+
+                // Spacer
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                // ========== Right Section: Metadata Badges ==========
+                HorizontalLayout {
+                    spacing: Theme.spacing_sm;
+                    alignment: center;
+
+                    // Stream quality badge
+                    Rectangle {
+                        height: 22px;
+                        min-width: 32px;
+                        background: Theme.surface;
+                        border-radius: Theme.radius_sm;
+                        border-width: 1px;
+                        border-color: Theme.border_color;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: root.stream_quality;
+                                vertical-alignment: center;
+                                color: Theme.text_secondary;
+                                font-size: Theme.font_size_sm;
+                                font-weight: 600;
+                            }
+                        }
+                    }
+
+                    // Channel count badge
+                    Rectangle {
+                        height: 22px;
+                        min-width: 50px;
+                        background: Theme.surface;
+                        border-radius: Theme.radius_sm;
+                        border-width: 1px;
+                        border-color: Theme.border_color;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: root.channel_count + " Ch";
+                                vertical-alignment: center;
+                                color: Theme.text_secondary;
+                                font-size: Theme.font_size_sm;
+                                font-weight: 600;
+                            }
+                        }
+                    }
+
+                    // App version badge
+                    Rectangle {
+                        height: 22px;
+                        min-width: 40px;
+                        background: Theme.surface;
+                        border-radius: Theme.radius_sm;
+                        border-width: 1px;
+                        border-color: Theme.border_color;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: "App " + root.app_version;
+                                vertical-alignment: center;
+                                color: Theme.text_secondary;
+                                font-size: Theme.font_size_sm;
+                                font-weight: 600;
+                            }
+                        }
+                    }
+
+                    // Core version badge
+                    Rectangle {
+                        height: 22px;
+                        min-width: 50px;
+                        background: Theme.surface;
+                        border-radius: Theme.radius_sm;
+                        border-width: 1px;
+                        border-color: Theme.border_color;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: "Core " + root.core_version;
+                                vertical-alignment: center;
+                                color: Theme.text_secondary;
+                                font-size: Theme.font_size_sm;
+                                font-weight: 600;
+                            }
+                        }
+                    }
+
+                    // Volume control
+                    Rectangle {
+                        width: 28px;
+                        height: 22px;
+                        border-radius: Theme.radius_sm;
+                        background: Theme.surface;
+
+                        Text {
+                            text: "🔊";
+                            font-size: 12px;
+                        }
+
+                        TouchArea {
+                            clicked => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
