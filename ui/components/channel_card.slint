@@ -1,0 +1,100 @@
+import { Theme } from "../theme.slint";
+
+export struct ChannelInfo {
+    // Domain fields matching iptv-core's Channel struct
+    id: string,
+    name: string,
+    alt_names: [string],
+    category_ids: [string],
+    country_code: string,
+    is_nsfw: bool,
+    launched: string,
+    closed: string,
+    website: string,
+    network: string,
+    
+    // UI-only display fields
+    // This could be removed, or I could make a randomizer
+    // to choose one color for each channel
+    logo_text: string,
+    logo_color: color,
+    current_program: string,
+    progress: float,
+}
+
+export component ChannelCard {
+    in property <ChannelInfo> channel;
+
+    width: Theme.channel_card_width;
+    height: Theme.channel_card_height;
+
+    callback clicked;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        background: Theme.card_bg;
+        border-radius: Theme.radius_md;
+        border-width: 1px;
+        border-color: Theme.border_color;
+
+        VerticalLayout {
+            padding: Theme.spacing_sm;
+            spacing: Theme.spacing_xs;
+
+            // Channel logo placeholder
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: Theme.radius_sm;
+                background: channel.logo_color;
+
+                Text {
+                    text: channel.logo_text;
+                    color: #ffffff;
+                    font-size: Theme.font_size_lg;
+                    font-weight: 700;
+                }
+            }
+
+            // Channel name
+            Text {
+                text: channel.name;
+                color: Theme.text_primary;
+                font-size: Theme.font_size_md;
+                font-weight: 600;
+                overflow: elide;
+            }
+
+            // Current program
+            Text {
+                text: channel.current_program;
+                color: Theme.text_secondary;
+                font-size: Theme.font_size_sm;
+                overflow: elide;
+            }
+
+            // Progress bar
+            Rectangle {
+                width: 100%;
+                height: 4px;
+                background: Theme.progress_bg;
+                border-radius: 2px;
+
+                Rectangle {
+                    width: parent.width * channel.progress;
+                    height: 100%;
+                    background: Theme.progress_fill;
+                    border-radius: 2px;
+                }
+            }
+        }
+
+        TouchArea {
+            clicked => {
+                root.clicked();
+                debug("Channel card clicked")
+            }
+        }
+    }
+}
