@@ -1,11 +1,10 @@
-import { ChannelInfo, Category, Country } from "../common.slint";
+import { Channel, Category, Country } from "../common.slint";
 
 export global HomeState {
     in-out property <Channel> channels;
     in-out property <Category> categories;
     in-out property <Country> countries;
-    
-    in-out property <int> current_page;
-    // request more channels with a page number
-    callback request-more-channels(int);
+
+    callback channel_selected(string);
+    callback category_selected(string);
 }
