@@ -1,26 +1,5 @@
 import { Theme } from "../theme.slint";
-
-export struct ChannelInfo {
-    // Domain fields matching iptv-core's Channel struct
-    id: string,
-    name: string,
-    alt_names: [string],
-    category_ids: [string],
-    country_code: string,
-    is_nsfw: bool,
-    launched: string,
-    closed: string,
-    website: string,
-    network: string,
-    
-    // UI-only display fields
-    // This could be removed, or I could make a randomizer
-    // to choose one color for each channel
-    logo_text: string,
-    logo_color: color,
-    current_program: string,
-    progress: float,
-}
+import { ChannelInfo } from "../common.slint";
 
 export component ChannelCard {
     in property <ChannelInfo> channel;

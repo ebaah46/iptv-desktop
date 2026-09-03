@@ -1,0 +1,34 @@
+export struct ChannelInfo {
+    // Domain fields matching iptv-core's Channel struct
+    id: string,
+    name: string,
+    alt_names: [string],
+    category_ids: [string],
+    country_code: string,
+    is_nsfw: bool,
+    launched: string,
+    closed: string,
+    website: string,
+    network: string,
+
+    // UI-only display fields
+    // This could be removed, or I could make a randomizer
+    // to choose one color for each channel
+    logo_text: string,
+    logo_color: color,
+    current_program: string,
+    progress: float,
+}
+
+export struct Category {
+    id: string,
+    name: string,
+    description: string
+}
+
+export struct Country{
+    id: string,
+    name: string,
+    languages: [string],
+    flag_url: string
+}
