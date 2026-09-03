@@ -1,1 +1,0 @@
-mod channel_view_model;
