@@ -903,7 +903,7 @@ dependencies = [
 [[package]]
 name = "core"
 version = "0.1.0"
-source = "git+https://github.com/ebaah46/iptv-core.git#3217a1e2cee95bcab773aa3759713374f10022ab"
+source = "git+https://github.com/ebaah46/iptv-core.git#e9fbd4081b94834f79f30c9f4c244539d145873c"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4827,7 +4827,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iptv-core = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
+libcore = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
 slint = "1.17.1"
 
 [build-dependencies]

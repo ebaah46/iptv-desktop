@@ -1,4 +1,4 @@
-mod view_models;
+mod mappers;
 mod controllers;
 
 slint::include_modules!();
