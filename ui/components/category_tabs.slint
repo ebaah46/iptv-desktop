@@ -1,9 +1,9 @@
 import { Theme } from "../theme.slint";
+import { HomeState } from "../globals/home_state.slint";
 
 export component CategoryTabs {
     in property <[string]> categories;
     in-out property <string> active_category: "All";
-    callback category_changed(string);
 
     width: 100%;
     height: 40px;
@@ -35,7 +35,7 @@ export component CategoryTabs {
                 TouchArea {
                     clicked => {
                         active_category = category;
-                        category_changed(category);
+                        HomeState.category_selected(category);
                     }
                 }
             }

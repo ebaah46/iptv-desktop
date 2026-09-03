@@ -93,7 +93,7 @@ export component HomeScreen {
                                     for ch in featured_channels : ChannelCard {
                                         channel: ch;
                                         clicked => {
-                                            channel_selected(ch.name);
+                                            HomeState.channel_selected(ch.name);
                                         }
                                     }
                                 }
@@ -123,7 +123,7 @@ export component HomeScreen {
                                     for ch in popular_channels : ChannelCard {
                                         channel: ch;
                                         clicked => {
-                                            channel_selected(ch.name);
+                                            HomeState.channel_selected(ch.name)
                                         }
                                     }
                                 }
