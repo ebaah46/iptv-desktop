@@ -2,19 +2,19 @@ import { Theme } from "../theme.slint";
 import { TopBar } from "../components/top_bar.slint";
 import { Sidebar } from "../components/sidebar.slint";
 import { ChannelCard } from "../components/channel_card.slint";
-import { ChannelInfo } from "../common.slint";
+import { Channel } from "../common.slint";
+import { HomeState } from "../globals/home_state.slint";
 import { CategoryTabs } from "../components/category_tabs.slint";
 import { StatusBar } from "../components/status_bar.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export component HomeScreen {
-    callback channel_selected(string);
 
     width: 100%;
     height: 100%;
 
     // Mock data
-    in property <[ChannelInfo]> featured_channels: [
+    in property <[Channel]> featured_channels: [
         { id: "espn-hd", name: "ESPN HD", alt_names: [], category_ids: ["sports"], country_code: "US", is_nsfw: false, launched: "1993-09-07", closed: "", website: "https://espn.com", network: "ESPN", logo_text: "E", logo_color: #e63946, current_program: "NFL Football", progress: 0.65 },
         { id: "cnn", name: "CNN", alt_names: [], category_ids: ["news"], country_code: "US", is_nsfw: false, launched: "1980-06-01", closed: "", website: "https://cnn.com", network: "Warner Bros. Discovery", logo_text: "C", logo_color: #457b9d, current_program: "Breaking News", progress: 0.30 },
         { id: "hbo", name: "HBO", alt_names: [], category_ids: ["movies"], country_code: "US", is_nsfw: false, launched: "1972-11-08", closed: "", website: "https://hbo.com", network: "Warner Bros. Discovery", logo_text: "H", logo_color: #6c5ce7, current_program: "The Last of Us", progress: 0.80 },
@@ -25,7 +25,7 @@ export component HomeScreen {
         { id: "fox-sports", name: "Fox Sports", alt_names: [], category_ids: ["sports"], country_code: "US", is_nsfw: false, launched: "1994-01-01", closed: "", website: "https://foxsports.com", network: "Fox Corporation", logo_text: "F", logo_color: #1a659e, current_program: "UFC Fight Night", progress: 0.45 },
     ];
 
-    in property <[ChannelInfo]> popular_channels: [
+    in property <[Channel]> popular_channels: [
         { id: "espn-hd", name: "ESPN HD", alt_names: [], category_ids: ["sports"], country_code: "US", is_nsfw: false, launched: "1993-09-07", closed: "", website: "https://espn.com", network: "ESPN", logo_text: "E", logo_color: #e63946, current_program: "NFL Football", progress: 0.65 },
         { id: "espn-2", name: "ESPN 2", alt_names: [], category_ids: ["sports"], country_code: "US", is_nsfw: false, launched: "1993-10-01", closed: "", website: "https://espn.com", network: "ESPN", logo_text: "2", logo_color: #e63946, current_program: "SportsCenter", progress: 0.20 },
         { id: "cnn", name: "CNN", alt_names: [], category_ids: ["news"], country_code: "US", is_nsfw: false, launched: "1980-06-01", closed: "", website: "https://cnn.com", network: "Warner Bros. Discovery", logo_text: "C", logo_color: #457b9d, current_program: "Breaking News", progress: 0.30 },
@@ -101,7 +101,7 @@ export component HomeScreen {
 
                             // Category filter tabs
                             CategoryTabs {
-                                categories: ["All", "Sports", "News", "Movies", "Documentaries", "Music", "Kids"];
+                                categories: ["All", "Sports", "News", "Movies", "Documentaries", "Music", "Kids"]; // HomeState.categories.
                                 active_category: "All";
                             }
 
