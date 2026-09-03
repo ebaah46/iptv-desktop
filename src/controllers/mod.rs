@@ -1,1 +1,1 @@
-mod catalog_controller;
+mod home_controller;
