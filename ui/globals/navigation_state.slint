@@ -1,0 +1,13 @@
+// Defines all available pages/screens in the app
+export enum Page {
+    Home,
+    Player,
+}
+
+export global NavigationState {
+    in-out property <Page> current_page: Page.Home;
+    in-out property <string> selected_channel_name;
+
+    // Navigate to a specific page
+    callback navigate(Page);
+}
