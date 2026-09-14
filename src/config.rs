@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use serde::Deserialize;
 
 /// Top-level application configuration.
@@ -27,6 +26,7 @@ pub struct ApiConfig {
 pub struct CacheConfig {
     pub ttl_days: u8,
     pub file_path: Option<String>,
+    pub db_file: String,
 }
 
 impl AppConfig {
@@ -72,6 +72,12 @@ impl AppConfig {
         let path = self.data_path()?;
         std::fs::create_dir_all(&path).ok()?;
         Some(path)
+    }
+
+    /// Returns the full path to the redb database file,
+    /// joining the runtime data directory with the configured `db_file` name.
+    pub fn cache_db_path(&self) -> Option<std::path::PathBuf> {
+        self.data_path().map(|p| p.join(&self.cache.db_file))
     }
 }
 
