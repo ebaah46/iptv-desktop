@@ -1,0 +1,14 @@
+{
+  "app": {
+    "qualifier": "com",
+    "organization": "iptv",
+    "application": "app"
+  },
+  "api": {
+    "base_url": "https://iptv-org.github.io/api/"
+  },
+  "cache": {
+    "ttl_days": 2,
+    "file_path": null
+  }
+}
