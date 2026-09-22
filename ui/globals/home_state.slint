@@ -1,9 +1,9 @@
 import { Channel, Category, Country } from "../common.slint";
 
 export global HomeState {
-    in-out property <Channel> channels;
-    in-out property <Category> categories;
-    in-out property <Country> countries;
+    in-out property <[Channel]> channels;
+    in-out property <[Category]> categories;
+    in-out property <[Country]> countries;
 
     callback channel_selected(string);
     callback category_selected(string);

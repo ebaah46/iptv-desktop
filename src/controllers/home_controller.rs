@@ -47,6 +47,13 @@ impl HomeController {
                 Self::handle_category_selected(&core, &home, category);
             }
         });
+        let countries: VecModel<Country> = self.core.catalog_service.get_countries().into_iter().map(to_country).collect();
+        home.set_countries(ModelRc::new(countries));
+        let categories:VecModel<Category> = self.core.catalog_service.get_categories().into_iter().map(to_category).collect();
+        home.set_categories(ModelRc::new(categories));
+        let channels:VecModel<Channel> = self.core.catalog_service.get_all().into_iter().map(to_channel_info).collect();
+        home.set_channels(ModelRc::new(channels));
+        dbg!("HomeController registered successfully");
     }
 
     /// Handle channel selection: navigate to the player screen

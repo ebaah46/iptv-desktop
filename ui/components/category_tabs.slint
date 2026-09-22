@@ -1,8 +1,10 @@
 import { Theme } from "../theme.slint";
 import { HomeState } from "../globals/home_state.slint";
+import { Category } from "../common.slint";
 
 export component CategoryTabs {
-    in property <[string]> categories;
+    in property <[Category]> categories;
+    in property <int> top_count: 0;
     in-out property <string> active_category: "All";
 
     width: 100%;
@@ -17,25 +19,50 @@ export component CategoryTabs {
             spacing: Theme.spacing_sm;
             alignment: center;
 
-            for category in categories : Rectangle {
+            // "All" virtual category tab
+            Rectangle {
                 width: 100px;
                 height: 32px;
-                background: category == active_category ? Theme.accent : Theme.surface;
+                background: active_category == "All" ? Theme.accent : Theme.surface;
                 border-radius: Theme.radius_md;
                 border-width: 1px;
-                border-color: category == active_category ? Theme.accent : Theme.border_color;
+                border-color: active_category == "All" ? Theme.accent : Theme.border_color;
 
                 Text {
-                    text: category;
-                    color: category == active_category ? #ffffff : Theme.text_secondary;
+                    text: "All";
+                    color: active_category == "All" ? #ffffff : Theme.text_secondary;
                     font-size: Theme.font_size_sm;
-                    font-weight: category == active_category ? 600 : 400;
+                    font-weight: active_category == "All" ? 600 : 400;
                 }
 
                 TouchArea {
                     clicked => {
-                        active_category = category;
-                        HomeState.category_selected(category);
+                        active_category = "All";
+                        HomeState.category_selected("All");
+                    }
+                }
+            }
+
+            // First N categories via index
+            for i in top_count : Rectangle {
+                width: 100px;
+                height: 32px;
+                background: categories[i].id == active_category ? Theme.accent : Theme.surface;
+                border-radius: Theme.radius_md;
+                border-width: 1px;
+                border-color: categories[i].id == active_category ? Theme.accent : Theme.border_color;
+
+                Text {
+                    text: categories[i].name;
+                    color: categories[i].id == active_category ? #ffffff : Theme.text_secondary;
+                    font-size: Theme.font_size_sm;
+                    font-weight: categories[i].id == active_category ? 600 : 400;
+                }
+
+                TouchArea {
+                    clicked => {
+                        active_category = categories[i].id;
+                        HomeState.category_selected(categories[i].id);
                     }
                 }
             }
