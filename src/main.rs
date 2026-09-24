@@ -1,6 +1,8 @@
 pub mod config;
 pub mod utils;
 pub mod player;
+mod ui;
+
 pub use config::AppConfig;
 pub use player::GstPlayerController;
 
@@ -16,6 +18,7 @@ use anyhow::Result as Res;
 
 fn main() -> Res<()> {
     let facade = Arc::new(build_facade());
+    ui::run(facade)?;
     Ok(())
 }
 
