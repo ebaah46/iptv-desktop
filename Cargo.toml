@@ -11,4 +11,5 @@ libcore = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_api = {package = "iptv-adapter-api", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_cache = {package = "iptv-adapter-cache", git = "https://github.com/ebaah46/iptv-core.git"}
 anyhow = "1.0.104"
+iced = "0.14.0"
 
