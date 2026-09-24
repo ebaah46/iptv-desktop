@@ -1,16 +1,25 @@
+pub mod config;
+pub mod utils;
+pub mod player;
+pub use config::AppConfig;
+pub use player::GstPlayerController;
+
 use std::sync::Arc;
-use slint::ComponentHandle;
 use libcore::facade::IptvFacade;
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
 use libcore::services::{catalog_repository::IptvCatalogRepository, catalog_service::IptvCatalogService, CatalogRepository, IpTvPlaybackController, IptvStreamResolver};
-use iptv_desktop::{HomeController, PlayerController, AppConfig, GstPlayerController, MainWindow};
 
-fn main() -> Result<(), slint::PlatformError> {
-    // Initialize GStreamer (required once before any GStreamer operations)
-    gstreamer::init().expect("Failed to initialize GStreamer");
 
-    let main_window = MainWindow::new()?;
+
+use anyhow::Result as Res;
+
+fn main() -> Res<()> {
+    let facade = Arc::new(build_facade());
+    Ok(())
+}
+
+fn build_facade() -> IptvFacade {
     let config = AppConfig::load().expect("Failed to load config");
 
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
@@ -24,13 +33,5 @@ fn main() -> Result<(), slint::PlatformError> {
     let player = Arc::new(GstPlayerController::new());
     let stream_resolver = Arc::new(IptvStreamResolver::new(iptv_repository.clone()));
     let play_back_controller = Arc::new(IpTvPlaybackController::new(stream_resolver, player));
-    let facade = Arc::new(IptvFacade::new(iptv_service, play_back_controller));
-    let home_controller = HomeController::new(main_window.as_weak(), facade.clone());
-    let player_controller = PlayerController::new(main_window.as_weak(), facade.clone());
-
-    // load catalog data before starting
-    iptv_repository.refresh();
-    home_controller.register();
-    player_controller.register();
-    main_window.run()
+    IptvFacade::new(iptv_service, play_back_controller)
 }
