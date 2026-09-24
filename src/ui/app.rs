@@ -6,15 +6,15 @@ use libcore::facade::{CoreFacade, IptvFacade};
 
 use crate::ui::message::Message;
 use crate::ui::page::Page;
-use crate::ui::screens::home::{view as home_view, HomeViewModel};
-use crate::ui::screens::player::{view as player_view, PlayerViewModel};
+use crate::ui::screens::home::{self, HomeState};
+use crate::ui::screens::player::{self, PlayerState};
 
 /// Root application state.
 pub struct App {
-    facade: Arc<IptvFacade>,
-    page: Page,
-    home: HomeViewModel,
-    player: PlayerViewModel,
+    pub facade: Arc<IptvFacade>,
+    pub page: Page,
+    pub home: HomeState,
+    pub player: PlayerState,
 }
 
 impl App {
@@ -22,8 +22,8 @@ impl App {
         Self {
             facade,
             page: Page::Home,
-            home: HomeViewModel::default(),
-            player: PlayerViewModel::default(),
+            home: HomeState::new(),
+            player: PlayerState::default(),
         }
     }
 }
@@ -33,35 +33,52 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::NavigateTo(page) => {
             state.page = page;
+            Task::none()
         }
-        Message::ChannelSelected(id) => {
-            state.player.channel_name = id.clone();
-            state.player.is_playing = true;
-            state.page = Page::Player;
+        Message::Home(msg) => {
+            home::update(&mut state.home, msg, state.facade.clone()).map(Message::Home)
         }
-        Message::CategorySelected(_id) => {}
-        Message::PlayPauseToggled(playing) => {
-            state.player.is_playing = playing;
-            if playing {
-                state.facade.play("");
-            } else {
-                state.facade.pause();
+        Message::Player(msg) => {
+            let is_back = matches!(&msg, player::PlayerMessage::BackRequested);
+            let is_channel_selected = matches!(&msg, player::PlayerMessage::ChannelSelected(_));
+            let result = player::update(&mut state.player, msg);
+            if is_back {
+                state.page = Page::Home;
             }
-        }
-        Message::BackRequested => {
-            state.player = PlayerViewModel::default();
-            state.facade.stop();
-            state.page = Page::Home;
-        }
+            if is_channel_selected {
+                state.page = Page::Player;
+            }
+            result.map(Message::Player)
+        },
+        Message::PrepareHome => {
+            dbg!("Preparing home, loading:{}", state.home.loading);
+
+            let facade = state.facade.clone();
+            Task::perform(
+                async move {
+                    facade.refresh();
+                    // let _ = tokio::task::spawn_blocking(move || ).await;
+                },
+                |_| Message::HomeReady,
+            )
+        },
+        Message::HomeReady => {
+            dbg!("Home ready");
+            state.home.channel_data = state.facade.catalog_service.get_all();
+            state.home.category_data =  state.facade.catalog_service.get_categories();
+            state.home.countries_data = state.facade.catalog_service.get_countries();
+            state.home.loading = false;
+            Task::none()
+        },
+        Message::Unknown => Task::none(),
     }
-    Task::none()
 }
 
 /// Renders the current screen.
 pub fn view(state: &App) -> Element<'_, Message> {
     match state.page {
-        Page::Home => home_view(&state.home),
-        Page::Player => player_view(&state.player),
+        Page::Home => home::view(&state.home).map(Message::Home),
+        Page::Player => player::view(&state.player).map(Message::Player),
     }
 }
 
