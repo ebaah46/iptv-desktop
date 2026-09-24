@@ -1,21 +1,44 @@
 use iced::widget::{column, container, text};
-use iced::{Element, Fill};
+use iced::{Element, Fill, Task};
 
 use crate::ui::theme;
 
-/// View-model data consumed by the player screen.
+/// Messages handled by the player screen.
+#[derive(Debug, Clone)]
+pub enum PlayerMessage {
+    ChannelSelected(String),
+    PlayPauseToggled(bool),
+    BackRequested,
+}
+
+/// State consumed by the player screen.
 #[derive(Debug, Clone, Default)]
-pub struct PlayerViewModel {
+pub struct PlayerState {
     pub is_playing: bool,
     pub is_loading: bool,
     pub error_message: String,
     pub channel_name: String,
 }
 
+/// Processes a player screen message and mutates state.
+pub fn update(state: &mut PlayerState, message: PlayerMessage) -> Task<PlayerMessage> {
+    match message {
+        PlayerMessage::ChannelSelected(id) => {
+            state.channel_name = id;
+            state.is_playing = true;
+        }
+        PlayerMessage::PlayPauseToggled(playing) => {
+            state.is_playing = playing;
+        }
+        PlayerMessage::BackRequested => {
+            *state = PlayerState::default();
+        }
+    }
+    Task::none()
+}
+
 /// Renders the player screen content.
-pub fn view<Message: 'static + Clone>(
-    _model: &PlayerViewModel,
-) -> Element<'_, Message> {
+pub fn view(state: &PlayerState) -> Element<'_, PlayerMessage> {
     container(
         column![
             text("Player Screen")
