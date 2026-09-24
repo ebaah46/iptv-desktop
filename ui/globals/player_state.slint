@@ -1,0 +1,11 @@
+// Global state for the player screen, shared between UI and Rust controller
+export global PlayerState {
+    in-out property <bool> is_playing: false;
+    in-out property <bool> is_loading: false;
+    in-out property <string> error_message: "";
+    in-out property <string> stream_url: "";
+
+    callback play_pause_toggled(bool);
+    callback back_requested();
+    callback stream_requested(string);
+}
