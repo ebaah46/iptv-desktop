@@ -75,7 +75,7 @@ export component HomeScreen {
                                     for i in featured_count : ChannelCard {
                                         channel: HomeState.channels[featured_start + i];
                                         clicked => {
-                                            HomeState.channel_selected(HomeState.channels[featured_start + i].name)
+                                            HomeState.channel_selected(HomeState.channels[featured_start + i].id)
                                         }
                                     }
                                 }
@@ -106,7 +106,7 @@ export component HomeScreen {
                                     for i in popular_count : ChannelCard {
                                         channel: HomeState.channels[i];
                                         clicked => {
-                                            HomeState.channel_selected(HomeState.channels[i].name)
+                                            HomeState.channel_selected(HomeState.channels[i].id)
                                         }
                                     }
                                 }

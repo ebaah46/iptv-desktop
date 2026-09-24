@@ -1,3 +1,2 @@
-mod home_controller;
-
-pub use home_controller::HomeController;
+pub mod home_controller;
+pub mod player_controller;

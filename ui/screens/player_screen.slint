@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
 import { NavigationState, Page } from "../globals/navigation_state.slint";
+import { PlayerState } from "../globals/player_state.slint";
 
 export component PlayerScreen {
     width: 100%;
@@ -29,7 +30,12 @@ export component PlayerScreen {
 
                 TouchArea {
                     clicked => {
+                        NavigationState.selected_channel_id = "";
+                        NavigationState.selected_channel_name = "";
+                        PlayerState.is_playing = false;
+                        PlayerState.is_loading = false;
                         NavigationState.current_page = Page.Home;
+                        PlayerState.back_requested();
                     }
                 }
             }
@@ -42,17 +48,93 @@ export component PlayerScreen {
                 font-weight: 700;
             }
 
-            // Placeholder video area
+            // Video player area with overlay
             Rectangle {
                 width: 100%;
-                height: 400px;
+                height: 500px;
                 background: Theme.surface;
                 border-radius: Theme.radius_md;
 
-                Text {
-                    text: "Video Player";
-                    color: Theme.text_secondary;
-                    font-size: Theme.font_size_lg;
+                VerticalLayout {
+                    width: 100%;
+                    height: 100%;
+                    alignment: center;
+
+
+                    // Loading indicator
+                    Text {
+                        text: "Loading stream...";
+                        color: Theme.text_secondary;
+                        font-size: Theme.font_size_lg;
+                        visible: PlayerState.is_loading;
+                        horizontal-alignment: center;
+                    }
+
+                    // Error message
+                    Text {
+                        text: PlayerState.error_message;
+                        color: Theme.accent;
+                        font-size: Theme.font_size_lg;
+                        visible: PlayerState.error_message != "";
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    // Centered play/pause controls
+                    HorizontalLayout {
+                        width: 100%;
+                        alignment: center;
+
+                        // Play button (visible when not playing, not loading, no error)
+                        Rectangle {
+                            width: 80px;
+                            height: 80px;
+                            border-radius: 40px;
+                            background: Theme.accent;
+                            opacity: 0.85;
+                            visible: !PlayerState.is_playing && !PlayerState.is_loading && PlayerState.error_message == "";
+
+                            Text {
+                                text: "▶";
+                                color: Theme.text_primary;
+                                font-size: 32px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    PlayerState.is_playing = true;
+                                    PlayerState.play_pause_toggled(true);
+                                }
+                            }
+                        }
+
+                        // Pause button (visible when playing, not loading, no error)
+                        Rectangle {
+                            width: 80px;
+                            height: 80px;
+                            border-radius: 40px;
+                            background: Theme.primary;
+                            opacity: 0.85;
+                            visible: PlayerState.is_playing && !PlayerState.is_loading && PlayerState.error_message == "";
+
+                            Text {
+                                text: "⏸";
+                                color: Theme.text_primary;
+                                font-size: 32px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    PlayerState.is_playing = false;
+                                    PlayerState.play_pause_toggled(false);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

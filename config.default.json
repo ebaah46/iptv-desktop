@@ -1,8 +1,8 @@
 {
   "app": {
-    "qualifier": "com",
-    "organization": "iptv",
-    "application": "app"
+    "qualifier": "",
+    "organization": "",
+    "application": "iptv"
   },
   "api": {
     "base_url": "https://iptv-org.github.io/api/"

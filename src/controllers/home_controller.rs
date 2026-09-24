@@ -1,12 +1,14 @@
-use slint::ComponentHandle;
+use slint::{ComponentHandle, ModelRc, VecModel};
 use std::sync::Arc;
-use libcore::facade::{CoreFacade, IptvFacade};
+use libcore::facade::IptvFacade;
 use slint::Weak;
 
-use crate::MainWindow;
+use crate::{Category, Channel, Country, MainWindow};
 use crate::HomeState;
 use crate::NavigationState;
 use crate::Page;
+use crate::PlayerState;
+use crate::mappers::{country_mapper::to_country, category_mapper::to_category, channel_mapper::to_channel_info};
 
 /**
 * Implement the home controller responsible for orchestrating the window
@@ -21,7 +23,6 @@ pub struct HomeController {
 
 impl HomeController {
 
-    const PAGE_SIZE: usize = 10;
     pub fn new(window: Weak<MainWindow>, core: Arc<IptvFacade>) -> Self {
         HomeController { window, core }
     }
@@ -33,9 +34,23 @@ impl HomeController {
         let home = window.global::<HomeState>();
 
         let weak_window = self.window.clone();
-        home.on_channel_selected(move |channel_name| {
+        home.on_channel_selected(move |channel_id| {
             if let Some(window) = weak_window.upgrade() {
-                Self::handle_channel_selected(&window, channel_name);
+                let nav = window.global::<NavigationState>();
+                let player = window.global::<PlayerState>();
+
+                // Set channel ID for the player screen
+                nav.set_selected_channel_id(channel_id.clone());
+
+                // Notify the player to load the stream
+                player.set_is_loading(true);
+                player.set_error_message("".into());
+
+                // Navigate to player page
+                nav.set_current_page(Page::Player);
+
+                // Trigger stream loading in the player controller
+                player.invoke_stream_requested(channel_id);
             }
         });
 
@@ -44,7 +59,7 @@ impl HomeController {
         home.on_category_selected(move |category| {
             if let Some(window) = weak_window.upgrade() {
                 let home = window.global::<HomeState>();
-                Self::handle_category_selected(&core, &home, category);
+                Self::handle_category_selected(&core.clone(), &home, category);
             }
         });
         let countries: VecModel<Country> = self.core.catalog_service.get_countries().into_iter().map(to_country).collect();
@@ -56,20 +71,9 @@ impl HomeController {
         dbg!("HomeController registered successfully");
     }
 
-    /// Handle channel selection: navigate to the player screen
-    fn handle_channel_selected(window: &MainWindow, channel_name: slint::SharedString) {
-        let nav = window.global::<NavigationState>();
-        nav.set_selected_channel_name(channel_name);
-        nav.set_current_page(Page::Player);
-    }
-
     /// Handle category selection: filter channels by the selected category
     fn handle_category_selected(core: &Arc<IptvFacade>, home: &HomeState, category: slint::SharedString) {
         let _ = (core, home, category);
         // TODO: Implement category filtering once the data model is updated
     }
-
-    /// load feeds for selected channel
-    fn load_feeds(&self, _channel_id: String) {}
-
 }
