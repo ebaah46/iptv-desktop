@@ -10,9 +10,11 @@ use std::sync::Arc;
 use libcore::facade::IptvFacade;
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
-use libcore::services::{catalog_repository::IptvCatalogRepository, catalog_service::IptvCatalogService, CatalogRepository, IpTvPlaybackController, IptvStreamResolver};
-
-
+use libcore::services::{
+    catalog_repository::IptvCatalogRepository,
+    catalog_service::IptvCatalogService,
+    IpTvPlaybackController, IptvStreamResolver,
+};
 
 use anyhow::Result as Res;
 
@@ -26,7 +28,8 @@ fn build_facade() -> IptvFacade {
     let config = AppConfig::load().expect("Failed to load config");
 
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
-    let cache_path = config.cache_db_path()
+    let cache_path = config
+        .cache_db_path()
         .expect("Failed to determine cache database path");
     println!("Cache path: {:?}", cache_path);
     let store = Arc::new(FileStore::new(cache_path, config.cache.ttl_days));
