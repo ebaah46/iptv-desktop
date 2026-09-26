@@ -51,19 +51,15 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             result.map(Message::Player)
         },
         Message::PrepareHome => {
-            dbg!("Preparing home, loading:{}", state.home.loading);
-
             let facade = state.facade.clone();
             Task::perform(
                 async move {
                     facade.refresh();
-                    // let _ = tokio::task::spawn_blocking(move || ).await;
                 },
                 |_| Message::HomeReady,
             )
         },
         Message::HomeReady => {
-            dbg!("Home ready");
             state.home.channel_data = state.facade.catalog_service.get_all();
             state.home.category_data =  state.facade.catalog_service.get_categories();
             state.home.countries_data = state.facade.catalog_service.get_countries();
