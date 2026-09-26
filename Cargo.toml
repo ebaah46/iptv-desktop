@@ -14,4 +14,8 @@ anyhow = "1.0.104"
 iced = "0.14.0"
 tokio = { version = "1", features = ["rt"] }
 iced_aw = { version = "0.14.1", features = ["full"], default-features = false }
+env_logger = "0.11.11"
+iced_video_player = "0.6.0"
+url = "2.5.8"
+log = "0.4.34"
 
