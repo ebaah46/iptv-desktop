@@ -6,7 +6,7 @@ mod ui;
 pub use config::AppConfig;
 pub use player::GstPlayerController;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use libcore::facade::IptvFacade;
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
@@ -17,8 +17,10 @@ use libcore::services::{
 };
 
 use anyhow::Result as Res;
+use iced_video_player::VideoPlayer;
 
 fn main() -> Res<()> {
+    env_logger::init();
     let facade = Arc::new(build_facade());
     ui::run(facade)?;
     Ok(())
@@ -36,7 +38,8 @@ fn build_facade() -> IptvFacade {
     let cache = Arc::new(IptvCacheStore::new(store));
     let iptv_repository = Arc::new(IptvCatalogRepository::new(client, cache));
     let iptv_service = Arc::new(IptvCatalogService::new(iptv_repository.clone()));
-    let player = Arc::new(GstPlayerController::new());
+    let player_controller = Arc::new(RwLock::new(None));
+    let player = Arc::new(GstPlayerController::new(player_controller.clone()));
     let stream_resolver = Arc::new(IptvStreamResolver::new(iptv_repository.clone()));
     let play_back_controller = Arc::new(IpTvPlaybackController::new(stream_resolver, player));
     IptvFacade::new(iptv_service, play_back_controller)
