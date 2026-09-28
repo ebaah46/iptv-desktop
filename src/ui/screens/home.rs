@@ -9,6 +9,7 @@ use libcore::facade::IptvFacade;
 use log::info;
 use crate::ui::components::category_tabs;
 use crate::ui::components::channel_card;
+use crate::ui::components::channel_grid;
 use crate::ui::components::sidebar::{self, SidebarState};
 use crate::ui::components::status_bar::{self, StatusBarData};
 use crate::ui::components::top_bar;
@@ -139,20 +140,18 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             .size(theme::FONT_SIZE_MD)
             .color(theme::TEXT_SECONDARY);
 
-        let result_cards: Vec<Element<'_, HomeMessage>> = results
-            .iter()
-            .map(|ch| {
-                let id = ch.id.clone();
-                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
-            })
-            .collect();
+        // Use 5 columns for the grid — adjust as desired.
+        let grid = channel_grid::view(
+            &results,
+            5,
+            theme::SPACING_MD,
+            |id| HomeMessage::ChannelClicked(id),
+        );
 
         let body = column![
             heading,
             result_count,
-            scrollable(column(result_cards).spacing(theme::SPACING_MD))
-                .width(Fill)
-                .height(Fill),
+            grid,
         ]
         .spacing(theme::SPACING_MD)
         .padding(theme::SPACING_XL)

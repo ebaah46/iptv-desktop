@@ -17,16 +17,22 @@ use libcore::services::{
 };
 
 use anyhow::Result as Res;
-use iced_video_player::VideoPlayer;
+use tokio::runtime::Runtime;
 
 fn main() -> Res<()> {
-    env_logger::init();
-    let facade = Arc::new(build_facade());
-    ui::run(facade)?;
-    Ok(())
+    // Set default log level to INFO so our [player], [app], [gst] logs show.
+    env_logger::Builder::from_default_env()
+        .filter(None, log::LevelFilter::Info)
+        .init();
+    let (facade, player) = build_facade();
+    let rt = Runtime::new().expect("Failed to create tokio runtime");
+    rt.block_on(async {
+        let _ = ui::run(facade, player);
+        Ok(())
+    })
 }
 
-fn build_facade() -> IptvFacade {
+fn build_facade() -> (Arc<IptvFacade>, Arc<GstPlayerController>) {
     let config = AppConfig::load().expect("Failed to load config");
 
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
@@ -38,9 +44,10 @@ fn build_facade() -> IptvFacade {
     let cache = Arc::new(IptvCacheStore::new(store));
     let iptv_repository = Arc::new(IptvCatalogRepository::new(client, cache));
     let iptv_service = Arc::new(IptvCatalogService::new(iptv_repository.clone()));
-    let player_controller = Arc::new(RwLock::new(None));
-    let player = Arc::new(GstPlayerController::new(player_controller.clone()));
+    let video_lock = Arc::new(RwLock::new(None));
+    let player = Arc::new(GstPlayerController::new(video_lock));
     let stream_resolver = Arc::new(IptvStreamResolver::new(iptv_repository.clone()));
-    let play_back_controller = Arc::new(IpTvPlaybackController::new(stream_resolver, player));
-    IptvFacade::new(iptv_service, play_back_controller)
+    let play_back_controller = Arc::new(IpTvPlaybackController::new(stream_resolver, player.clone()));
+    let facade = Arc::new(IptvFacade::new(iptv_service, play_back_controller));
+    (facade, player)
 }
