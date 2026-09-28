@@ -9,7 +9,7 @@ use log::info;
 
 #[derive(Debug)]
 pub struct GstPlayerController {
-    video: Arc<RwLock<Option<Video>>>
+    pub video: Arc<RwLock<Option<Video>>>
 }
 
 impl GstPlayerController {
