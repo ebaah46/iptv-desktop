@@ -6,7 +6,7 @@ use iced::{Center, Element, Fill, Font, Task};
 use iced_aw::widgets::spinner::Spinner;
 use libcore::domain::{Categories, Channels, Countries};
 use libcore::facade::IptvFacade;
-
+use log::info;
 use crate::ui::components::category_tabs;
 use crate::ui::components::channel_card;
 use crate::ui::components::sidebar::{self, SidebarState};
@@ -36,6 +36,8 @@ pub struct HomeState {
     pub countries_data: Countries,
     pub loading: bool,
     pub active_category: String,
+    /// Channels matching the current search query (empty if no search active).
+    pub search_results: Channels,
 }
 
 impl HomeState {
@@ -53,7 +55,7 @@ impl HomeState {
 pub fn update(
     state: &mut HomeState,
     message: HomeMessage,
-    _facade: Arc<IptvFacade>,
+    facade: Arc<IptvFacade>,
 ) -> Task<HomeMessage> {
     match message {
         HomeMessage::CategorySelected(name) => {
@@ -66,7 +68,27 @@ pub fn update(
             state.top_bar_active_tab = tab;
         }
         HomeMessage::SearchChanged(query) => {
-            state.top_bar_search_query = query;
+            state.top_bar_search_query = query.clone();
+            let trimmed = query.trim().to_ascii_lowercase();
+            info!("[home] SearchChanged: query='{}'", &query);
+            if trimmed.is_empty() {
+                state.search_results = Channels::default();
+            } else {
+                // Search channel_data by name or alt_names (same logic as the service).
+                state.search_results = state
+                    .channel_data
+                    .iter()
+                    .filter(|ch| {
+                        ch.name.to_ascii_lowercase().contains(&trimmed)
+                            || ch
+                                .alt_names
+                                .iter()
+                                .any(|a| a.to_ascii_lowercase().contains(&trimmed))
+                    })
+                    .cloned()
+                    .collect();
+                info!("[home] Search results: {} channels", state.search_results.len());
+            }
         }
         HomeMessage::ChannelClicked(_id) => {
             // Navigation to player will be handled at the app level.
@@ -97,6 +119,46 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
         container(Spinner::default())
             .center_x(Fill)
             .center_y(Fill)
+            .width(Fill)
+            .height(Fill)
+            .into()
+    } else if !state.top_bar_search_query.trim().is_empty() {
+        // ── Search results view ─────────────────────────────────────────
+        let results = state.search_results.clone();
+        let query = state.top_bar_search_query.clone();
+
+        let heading = text(format!("Search results for \"{}\"", &query))
+            .size(theme::FONT_SIZE_XL)
+            .color(theme::TEXT_PRIMARY)
+            .font(Font {
+                weight: iced::font::Weight::Bold,
+                ..Font::DEFAULT
+            });
+
+        let result_count = text(format!("{} channels found", results.len()))
+            .size(theme::FONT_SIZE_MD)
+            .color(theme::TEXT_SECONDARY);
+
+        let result_cards: Vec<Element<'_, HomeMessage>> = results
+            .iter()
+            .map(|ch| {
+                let id = ch.id.clone();
+                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
+            })
+            .collect();
+
+        let body = column![
+            heading,
+            result_count,
+            scrollable(column(result_cards).spacing(theme::SPACING_MD))
+                .width(Fill)
+                .height(Fill),
+        ]
+        .spacing(theme::SPACING_MD)
+        .padding(theme::SPACING_XL)
+        .align_x(Center);
+
+        scrollable(body)
             .width(Fill)
             .height(Fill)
             .into()
