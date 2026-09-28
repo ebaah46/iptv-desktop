@@ -1,4 +1,4 @@
-use iced::widget::{column, container, text};
+use iced::widget::{button, column, container, text};
 use iced::{Color, Element, Fill, Font};
 
 use libcore::domain::Channel;
@@ -19,10 +19,11 @@ fn color_from_name(name: &str) -> Color {
 /// Renders a single channel card.
 pub fn view<Message: 'static + Clone>(
     channel: &Channel,
-    _on_selected: impl Fn(String) -> Message + 'static + Clone,
+    on_selected: impl Fn(String) -> Message + 'static + Clone,
 ) -> Element<'static, Message> {
     let channel_name = channel.name.clone();
     let logo_color = color_from_name(&channel_name);
+    let logo_name = channel_name.clone();
     let logo_text = channel_name
         .chars()
         .take(2)
@@ -50,7 +51,7 @@ pub fn view<Message: 'static + Clone>(
             }
         });
 
-    let name = text(channel_name)
+    let name = text(logo_name)
         .size(theme::FONT_SIZE_MD)
         .color(theme::TEXT_PRIMARY)
         .font(Font {
@@ -89,20 +90,30 @@ pub fn view<Message: 'static + Clone>(
         .spacing(theme::SPACING_XS)
         .padding(theme::SPACING_SM);
 
-    container(body)
-        .width(theme::CHANNEL_CARD_WIDTH)
-        .height(theme::CHANNEL_CARD_HEIGHT)
-        .style(|_theme: &iced::Theme| {
-            use iced::widget::container::Style;
-            Style {
-                background: Some(iced::Background::Color(theme::CARD_BG)),
-                border: iced::Border {
-                    width: 1.0,
-                    color: theme::BORDER_COLOR,
-                    radius: theme::RADIUS_MD.into(),
-                },
-                ..Style::default()
-            }
-        })
-        .into()
+    button(
+        container(body)
+            .width(theme::CHANNEL_CARD_WIDTH)
+            .height(theme::CHANNEL_CARD_HEIGHT)
+            .style(|_theme: &iced::Theme| {
+                use iced::widget::container::Style;
+                Style {
+                    background: Some(iced::Background::Color(theme::CARD_BG)),
+                    border: iced::Border {
+                        width: 1.0,
+                        color: theme::BORDER_COLOR,
+                        radius: theme::RADIUS_MD.into(),
+                    },
+                    ..Style::default()
+                }
+            }),
+    )
+    .on_press(on_selected(channel.id.clone()))
+    .style(|_theme: &iced::Theme, _status| {
+        use iced::widget::button::Style;
+        Style {
+            background: None,
+            ..Style::default()
+        }
+    })
+    .into()
 }
