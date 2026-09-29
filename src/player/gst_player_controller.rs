@@ -1,121 +1,68 @@
-use std::sync::Mutex;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use libcore::domain::Stream;
 use libcore::ports::PlayerController;
-use anyhow::Result as Res;
 
-/// A GStreamer-based player controller implementation.
-///
-/// Uses `playbin` which handles demuxing, decoding and playback
-/// automatically. The pipeline is stored behind a Mutex for interior
-/// mutability, required for the `Send + Sync` trait bounds.
+use anyhow::Result as Res;
+use iced_video_player::Video;
+use log::info;
+
 #[derive(Debug)]
 pub struct GstPlayerController {
-    pipeline: Mutex<Option<gstreamer::Element>>,
+    pub video: Arc<RwLock<Option<Video>>>
 }
 
 impl GstPlayerController {
-    pub fn new() -> Self {
-        GstPlayerController {
-            pipeline: Mutex::new(None),
-        }
+    pub fn new(video: Arc<RwLock<Option<Video>>>) -> Self {
+        Self { video }
     }
 }
 
 impl PlayerController for GstPlayerController {
     fn load(&self, stream: Stream) -> Res<()> {
-        use gstreamer::prelude::*;
-
-        // Create the playbin element
-        let playbin = gstreamer::ElementFactory::make("playbin")
-            .name("playbin")
-            .build()?;
-
-        // Set the URI
-        playbin.set_property("uri", &stream.url);
-
-        // Clone a reference for the bus watcher thread before storing the original
-        let bus_playbin = playbin.clone();
-
-        // Store the pipeline
-        *self.pipeline.lock().unwrap() = Some(playbin);
-
-        // Set up a bus watcher on a separate thread
-        let bus = bus_playbin.bus().expect("playbin without bus");
-        std::thread::spawn(move || {
-            for msg in bus.iter() {
-                use gstreamer::MessageView;
-                match msg.view() {
-                    MessageView::Eos(..) => {
-                        eprintln!("[GstPlayer] EOS received");
-                        let _ = bus_playbin.set_state(gstreamer::State::Null);
-                        break;
-                    }
-                    MessageView::Error(err) => {
-                        eprintln!(
-                            "[GstPlayer] Error: {} ({})",
-                            err.error(),
-                            err.debug().unwrap_or_default()
-                        );
-                        let _ = bus_playbin.set_state(gstreamer::State::Null);
-                        break;
-                    }
-                    MessageView::StateChanged(state_changed) => {
-                        if let Some(src) = state_changed.src() {
-                            if src.name() == "playbin" {
-                                let old = state_changed.old();
-                                let new = state_changed.current();
-                                eprintln!("[GstPlayer] State changed: {:?} -> {:?}", old, new);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            let _ = bus_playbin.set_state(gstreamer::State::Null);
-            eprintln!("[GstPlayer] Bus watch thread exiting");
-        });
-
+        let url = url::Url::parse(stream.url.as_str())?;
+        let video = Video::new(&url).map_err(|err| anyhow::anyhow!("Player error could not load video, error: {}",err))?;
+        if let Ok(mut write_guard) = self.video.write(){
+            *write_guard = Some(video);
+        } else {
+            return Err(anyhow::anyhow!("Player could not load video, lock poisoned"));
+        }
         Ok(())
     }
 
     fn play(&self) -> Res<()> {
-        use gstreamer::prelude::*;
-        let pipeline = self.pipeline.lock().unwrap();
-        if let Some(ref playbin) = *pipeline {
-            playbin.set_state(gstreamer::State::Playing)?;
-        }
+        let mut write_guard = self.video.write().map_err(|err| anyhow::anyhow!("Player could not play video, lock poisoned"))?;
+        let video = write_guard.as_mut().ok_or(anyhow::anyhow!("Player could not play video, no video loaded"))?;
+        video.set_paused(false);
         Ok(())
     }
 
     fn pause(&self) -> Res<()> {
-        use gstreamer::prelude::*;
-        let pipeline = self.pipeline.lock().unwrap();
-        if let Some(ref playbin) = *pipeline {
-            playbin.set_state(gstreamer::State::Paused)?;
-        }
+        let mut write_guard = self.video.write().map_err(|err| anyhow::anyhow!("Player could not play video, lock poisoned"))?;
+        let video = write_guard.as_mut().ok_or(anyhow::anyhow!("Player could not play video, no video loaded"))?;
+        video.set_paused(true);
         Ok(())
     }
 
     fn stop(&self) -> Res<()> {
-        use gstreamer::prelude::*;
-        let pipeline = self.pipeline.lock().unwrap();
-        if let Some(ref playbin) = *pipeline {
-            playbin.set_state(gstreamer::State::Null)?;
-        }
+        let mut write_guard = self.video.write().map_err(|err| anyhow::anyhow!("Player could not play video, lock poisoned"))?;
+        let video = write_guard.as_mut().ok_or(anyhow::anyhow!("Player could not play video, no video loaded"))?;
+        video.set_paused(true);
+        video.seek(Duration::ZERO, false)?;
         Ok(())
     }
 
+    // for streaming seek can only move to a previous time and not future time
     fn seek_position(&self, position: u32) -> Res<()> {
-        use gstreamer::prelude::*;
-        let pipeline = self.pipeline.lock().unwrap();
-        if let Some(ref playbin) = *pipeline {
-            let position_ns = gstreamer::ClockTime::from_seconds(position as u64);
-            playbin.seek_simple(
-                gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::KEY_UNIT,
-                position_ns,
-            )?;
+        let mut write_guard = self.video.write().map_err(|err| anyhow::anyhow!("Player could not play video, lock poisoned"))?;
+        let video = write_guard.as_mut().ok_or(anyhow::anyhow!("Player could not play video, no video loaded"))?;
+        let target_time = Duration::from_secs(position as u64);
+        let current_time = video.position();
+        if target_time > current_time {
+            info!("Seeking to future time not possible. Current time: {}, Target time: {}",current_time.as_secs(), target_time.as_secs());
+            return Ok(())
         }
+        video.seek(target_time, false)?; // seek
         Ok(())
     }
 }
