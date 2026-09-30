@@ -1,13 +1,17 @@
-use std::sync::{Arc, RwLock};
-
-use iced::{Element, Task, Theme};
+use std::hash::{Hash, Hasher};
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use iced::{futures::stream, futures::Stream, Element, Subscription, Task, Theme};
 
 use libcore::facade::{CoreFacade, IptvFacade};
-use iced_video_player::Video;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc;
+use crate::player::commands::{PlayerCommand, PlayerEvent};
 use crate::ui::message::Message;
 use crate::ui::page::Page;
 use crate::ui::screens::home::{self, HomeMessage, HomeState};
 use crate::ui::screens::player::{self, PlayerState};
+use crate::ui::screens::player::PlayerMessage::{ApplyLoad, ApplyPause, ApplyPlay, ApplySeek, ApplyStop};
 
 /// Root application state.
 pub struct App {
@@ -15,18 +19,50 @@ pub struct App {
     pub page: Page,
     pub home: HomeState,
     pub player: PlayerState,
+    pub command_rx: Arc<Mutex<Option<UnboundedReceiver<PlayerCommand>>>>,
 }
 
 impl App {
-    pub fn new(facade: Arc<IptvFacade>, video_lock: Arc<RwLock<Option<Video>>>) -> Self {
+    pub fn new(facade: Arc<IptvFacade>, command_tx: UnboundedReceiver<PlayerCommand>, event_tx: UnboundedSender<PlayerEvent>) -> Self {
         let mut player = PlayerState::default();
-        player.video = video_lock;
+        player.event_tx = Some(event_tx.clone());
         Self {
             facade,
             page: Page::Home,
             home: HomeState::new(),
             player,
+            command_rx: Arc::new(Mutex::new(Some(command_tx))),
         }
+    }
+    /// Called repeatedly by iced. Must return a stable, pure recipe.
+    pub fn subscription(&self) -> Subscription<Message> {
+        let id = PlayerCommandsId {
+            rx_slot: self.command_rx.clone(),
+        };
+
+        Subscription::run_with(id, Self::player_commands_stream)
+    }
+
+    fn player_commands_stream(
+        id: &PlayerCommandsId,
+    ) -> Pin<Box<dyn Stream<Item = Message> + Send>>  {
+        let rx = {
+            let mut guard = id.rx_slot
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            guard.take()
+        };
+
+        let rx = match rx {
+            Some(rx) => rx,
+            None => return Box::pin(stream::empty()),
+        };
+
+        Box::pin(stream::unfold(rx, |mut rx| async move {
+            rx.recv()
+                .await
+                .map(|command| (Message::PlayerCommand(command), rx))
+        }))
     }
 }
 
@@ -72,6 +108,18 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             state.home.loading = false;
             Task::none()
         },
+
+        Message::PlayerCommand(command) => {
+            let msg = match command {
+                PlayerCommand::Load(stream) => ApplyLoad(stream),
+                PlayerCommand::Play => ApplyPlay,
+                PlayerCommand::Pause => ApplyPause,
+                PlayerCommand::Stop => ApplyStop,
+                PlayerCommand::Seek(pos) => ApplySeek(pos),
+            };
+            player::update(&mut state.player, msg, state.facade.clone()).map(Message::Player)
+        }
+
         Message::Unknown => Task::none(),
     }
 }
@@ -92,3 +140,21 @@ pub fn view(state: &App) -> Element<'_, Message> {
 pub fn theme(_state: &App) -> Theme {
     Theme::Dark
 }
+
+#[derive(Clone)]
+struct PlayerCommandsId {
+    rx_slot: Arc<Mutex<Option<mpsc::UnboundedReceiver<PlayerCommand>>>>,
+}
+
+impl Hash for PlayerCommandsId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.rx_slot).hash(state);
+    }
+}
+
+impl PartialEq for PlayerCommandsId {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.rx_slot, &other.rx_slot)
+    }
+}
+impl Eq for PlayerCommandsId {}
