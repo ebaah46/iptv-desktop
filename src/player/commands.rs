@@ -12,3 +12,16 @@ pub enum PlayerCommand {
     Stop,
     Seek(u32)
 }
+
+
+/**
+* This enumeration defines events that can be received from the player UI
+* state about an ongoing video/audio playback.
+*/
+
+#[derive(Debug, Clone)]
+pub enum PlayerEvent {
+    Started,
+    Failed(String),
+    Stopped
+}
