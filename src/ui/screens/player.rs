@@ -1,11 +1,13 @@
-use std::sync::{Arc, RwLock};
-
+use std::sync::Arc;
+use std::time::Duration;
 use iced::widget::{button, column, container, text};
 use iced::{Center, Element, Fill, Padding, Task};
-use iced_video_player::{Video, VideoPlayer};
+use iced_video_player::{Error, Video, VideoPlayer};
+use libcore::domain::Stream;
 use libcore::facade::{CoreFacade, IptvFacade};
-use log::info;
-
+use log::{info, warn};
+use tokio::sync::mpsc::UnboundedSender;
+use crate::player::commands::PlayerEvent;
 use crate::ui::theme;
 
 /// Messages handled by the player screen.
@@ -13,8 +15,15 @@ use crate::ui::theme;
 pub enum PlayerMessage {
     PlayPauseToggled(bool),
     BackRequested,
-    /// Sent after facade.play() finishes — Video is in the shared lock.
+    ApplyLoad(Stream),
+    ApplyPlay,
+    ApplyPause,
+    ApplyStop,
+    ApplySeek(u32),
+    /// Sent after video is loaded into the UI widget.
     VideoLoaded,
+    /// Sent after video starts playing
+    Playing,
     /// Sent after facade.pause() finishes.
     Paused,
     /// Sent after facade.stop() finishes.
@@ -24,9 +33,7 @@ pub enum PlayerMessage {
 /// State consumed by the player screen.
 #[derive(Debug, Default)]
 pub struct PlayerState {
-    /// Shared lock containing the currently loaded Video (same Arc as GstPlayerController).
-    pub video: Arc<RwLock<Option<Video>>>,
-    /// Owned Video taken from the shared lock after loading completes.
+    /// Owned Video taken from the application level.
     pub loaded_video: Option<Video>,
     pub is_playing: bool,
     pub is_loading: bool,
@@ -35,6 +42,8 @@ pub struct PlayerState {
     pub channel_id: String,
     /// Set by update() to signal app.rs to navigate back.
     pub is_back_requested: bool,
+    // This channel sends player events to libcore about player states.
+    pub event_tx: Option<UnboundedSender<PlayerEvent>>,
 }
 
 /// Processes a player screen message and mutates state.
@@ -48,49 +57,23 @@ pub fn update(
             info!("[player] PlayPauseToggled(true) — starting playback");
             state.is_loading = true;
             let id = state.channel_id.clone();
-            let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-            std::thread::spawn(move || {
-                info!("[player] Background: calling facade.play({})", &id);
+            let facade = facade.clone();
+            tokio::task::spawn_blocking(move || {
                 facade.play(&id);
-                info!("[player] Background: facade.play() returned");
-                let _ = tx.send(());
             });
-            Task::perform(
-                async move {
-                    let _ = rx.await;
-                    PlayerMessage::VideoLoaded
-                },
-                std::convert::identity,
-            )
+            Task::none()
         }
         PlayerMessage::VideoLoaded => {
-            info!("[player] VideoLoaded — taking Video from shared lock");
+            info!("[player] VideoLoaded — playback to start shortly.");
             state.is_loading = false;
-            if let Ok(mut guard) = state.video.write() {
-                state.loaded_video = guard.take();
-                if state.loaded_video.is_some() {
-                    state.is_playing = true;
-                    info!("[player] Video stored successfully");
-                } else {
-                    state.error_message = "Failed to load video".to_string();
-                    info!("[player] Video was None — playback failed");
-                }
-            } else {
-                state.error_message = "Failed to load video".to_string();
-                info!("[player] Could not acquire write lock");
-            }
+            state.is_playing = true;
             Task::none()
         }
         PlayerMessage::PlayPauseToggled(false) => {
             info!("[player] PlayPauseToggled(false) — pausing");
             state.is_playing = false;
-            Task::perform(
-                tokio::task::spawn_blocking(move || {
-                    info!("[player] Background: calling facade.pause()");
-                    facade.pause();
-                }),
-                |_| PlayerMessage::Paused,
-            )
+            facade.pause();
+            Task::none()
         }
         PlayerMessage::Paused => {
             info!("[player] Paused");
@@ -99,10 +82,10 @@ pub fn update(
         PlayerMessage::BackRequested => {
             info!("[player] BackRequested — stopping playback");
             Task::perform(
-                tokio::task::spawn_blocking(move || {
-                    info!("[player] Background: calling facade.stop()");
+                async move {
+                    info!("[player] calling facade.stop()");
                     facade.stop();
-                }),
+                },
                 |_| PlayerMessage::Stopped,
             )
         }
@@ -112,6 +95,62 @@ pub fn update(
             state.is_back_requested = true;
             Task::none()
         }
+        PlayerMessage::ApplyLoad(stream) => {
+            let result = url::Url::parse(&stream.url)
+                .ok()
+                .and_then(|url| Video::new(&url).ok());
+
+            state.loaded_video = result;
+
+            let event = match state.loaded_video {
+                Some(_) => PlayerEvent::Started,
+                None => PlayerEvent::Failed("load failed".into()),
+            };
+            // Send event back to libcore about the load operation
+            state.event_tx.as_ref().map(|tx| tx.send(event));
+            Task::done(PlayerMessage::VideoLoaded)
+        },
+
+        PlayerMessage::ApplyPlay => {
+            if let Some(video) = state.loaded_video.as_mut(){
+                video.set_paused(false)
+            } else {
+                warn!("[player] Could not set playback state, loaded video not available");
+            }
+            Task::none()
+        },
+        PlayerMessage::ApplyPause => {
+            if let Some(video) = state.loaded_video.as_mut() {
+                video.set_paused(true)
+            } else {
+                warn!("[player] Could not set playback state");
+            }
+            Task::done(PlayerMessage::Paused)
+        },
+        PlayerMessage::ApplyStop => {
+            if let Some(video) = state.loaded_video.as_mut() {
+                video.set_paused(true);
+                let event  = match video.seek(Duration::ZERO, false){
+                    Ok(_) => PlayerEvent::Stopped,
+                    Err(_) => PlayerEvent::Failed("Failed to complete video stop process".into()),
+                };
+                state.event_tx.as_ref().map(|tx| tx.send(event));
+            }
+            Task::done(PlayerMessage::Stopped)
+        },
+        PlayerMessage::ApplySeek(position) => {
+            if let Some(video) = state.loaded_video.as_mut() {
+                let target_time = Duration::from_secs(position as u64);
+                let current_time = video.position();
+                if target_time > current_time {
+                    info!("Seeking to future time not possible. Current time: {}, Target time: {}",current_time.as_secs(), target_time.as_secs());
+                    return Task::none();
+                }
+                let _ = video.seek(target_time, false);
+            }
+            Task::none()
+        },
+        PlayerMessage::Playing => Task::none(),
     }
 }
 
