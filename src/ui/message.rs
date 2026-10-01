@@ -1,3 +1,4 @@
+use crate::player::commands::PlayerCommand;
 use crate::ui::page::Page;
 use crate::ui::screens::home::HomeMessage;
 use crate::ui::screens::player::PlayerMessage;
@@ -16,6 +17,8 @@ pub enum Message {
     Home(HomeMessage),
     /// Delegate to the player screen.
     Player(PlayerMessage),
+
+    PlayerCommand(PlayerCommand),
 
     Unknown
 }
