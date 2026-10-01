@@ -102,7 +102,7 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             )
         },
         Message::HomeReady => {
-            state.home.channel_data = state.facade.catalog_service.get_all();
+            state.home.channel_data = Arc::new(state.facade.catalog_service.get_all());
             state.home.category_data =  state.facade.catalog_service.get_categories();
             state.home.countries_data = state.facade.catalog_service.get_countries();
             state.home.loading = false;

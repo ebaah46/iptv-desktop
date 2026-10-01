@@ -21,6 +21,8 @@ pub enum HomeMessage {
     CategorySelected(String),
     TabSelected(String),
     SearchChanged(String),
+    SearchResultsReady(String, Channels),
+    DebounceExpired(u64, String),
     ChannelClicked(String),
 }
 
@@ -32,13 +34,17 @@ pub struct HomeState {
     pub top_bar_active_tab: String,
     pub top_bar_search_query: String,
     pub status_bar: StatusBarData,
-    pub channel_data: Channels,
+    pub channel_data: Arc<Channels>,
     pub category_data: Categories,
     pub countries_data: Countries,
     pub loading: bool,
     pub active_category: String,
     /// Channels matching the current search query (empty if no search active).
     pub search_results: Channels,
+    /// pending_search prevents race conditions when user types quickly
+    pending_search: String,
+    /// search id for identifying each query string on each key stroke
+    search_id: u64,
 }
 
 impl HomeState {
@@ -64,38 +70,67 @@ pub fn update(
                 state.sidebar.active_index = index;
             }
             state.active_category = name;
+            Task::none()
         }
         HomeMessage::TabSelected(tab) => {
             state.top_bar_active_tab = tab;
+            Task::none()
         }
         HomeMessage::SearchChanged(query) => {
-            state.top_bar_search_query = query.clone();
             let trimmed = query.trim().to_ascii_lowercase();
-            info!("[home] SearchChanged: query='{}'", &query);
-            if trimmed.is_empty() {
-                state.search_results = Channels::default();
-            } else {
-                // Search channel_data by name or alt_names (same logic as the service).
-                state.search_results = state
-                    .channel_data
-                    .iter()
-                    .filter(|ch| {
-                        ch.name.to_ascii_lowercase().contains(&trimmed)
-                            || ch
-                                .alt_names
-                                .iter()
-                                .any(|a| a.to_ascii_lowercase().contains(&trimmed))
-                    })
-                    .cloned()
-                    .collect();
-                info!("[home] Search results: {} channels", state.search_results.len());
+            state.top_bar_search_query = query;
+            state.pending_search = trimmed.clone();
+
+            // Increment search_id so the older pending debounce becomes invalid
+            state.search_id += 1;
+            let current_id = state.search_id;
+
+            // Wait 200ms off the main thread before dispatching the search task
+            Task::perform(
+                async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    current_id
+                },
+                move |id| HomeMessage::DebounceExpired(id, trimmed),
+            )
+        }
+
+        HomeMessage::DebounceExpired(id, query) => {
+            if id != state.search_id {
+                return Task::none();
             }
+
+            // Spawn background thread to filter
+            let data = state.channel_data.clone();
+            let query_string = query.clone();
+            Task::perform(
+                tokio::task::spawn_blocking(move || {
+                    let results: Channels = data
+                        .iter()
+                        .filter(|ch| {
+                            ch.name.to_ascii_lowercase().contains(&query_string)
+                                || ch.alt_names.iter().any(|a| a.to_ascii_lowercase().contains(&query_string))
+                        })
+                        .cloned()
+                        .collect();
+                    HomeMessage::SearchResultsReady(query, results)
+                }),
+                |res| res.unwrap_or_else(|_| HomeMessage::SearchResultsReady("".into(), vec![])),
+            )
+        }
+        HomeMessage::SearchResultsReady(query, results) => {
+            // Ignore stale results if a newer search was started
+            // this prevents data races so we can avoid locks
+            if state.pending_search == query {
+                state.search_results = results;
+            }
+            Task::none()
         }
         HomeMessage::ChannelClicked(_id) => {
             // Navigation to player will be handled at the app level.
+            Task::none()
         }
     }
-    Task::none()
 }
 
 /// Renders the home screen content.
