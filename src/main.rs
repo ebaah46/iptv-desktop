@@ -44,15 +44,15 @@ fn main() -> Res<()> {
 
     // ── Runtime-dependent initialization (inside tokio runtime) ─────
     let rt = Runtime::new().expect("Failed to create tokio runtime");
-    rt.block_on(async {
+    let (facade, command_rx, event_tx) = rt.block_on(async {
         let (command_tx, command_rx) = mpsc::unbounded_channel::<PlayerCommand>();
         let (event_tx, event_rx) = mpsc::unbounded_channel::<PlayerEvent>();
         let player = Arc::new(GstPlayerController::new(command_tx, event_rx));
         let play_back_controller = Arc::new(IpTvPlaybackController::new(stream_resolver, player.clone()));
         player.set_listener(play_back_controller.clone());
         let facade = Arc::new(IptvFacade::new(iptv_service, play_back_controller));
-        let _ = ui::run(facade, command_rx, event_tx);
+        (facade, command_rx, event_tx)
     });
-    rt.shutdown_timeout(Duration::from_secs(5));
+    let _ = ui::run(facade, command_rx, event_tx);
     Ok(())
 }
