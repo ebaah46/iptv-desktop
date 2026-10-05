@@ -816,8 +816,8 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.2.3"
-source = "git+https://github.com/ebaah46/iptv-core.git#01776f0410c7410d61f60a19b444913023d07e62"
+version = "0.3.0"
+source = "git+https://github.com/ebaah46/iptv-core.git#2aeba28a1e5c32e457d9426eaed023c7a7ea04d6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2577,8 +2577,8 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "iptv-adapter-api"
-version = "0.1.3"
-source = "git+https://github.com/ebaah46/iptv-core.git#01776f0410c7410d61f60a19b444913023d07e62"
+version = "0.2.0"
+source = "git+https://github.com/ebaah46/iptv-core.git#2aeba28a1e5c32e457d9426eaed023c7a7ea04d6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2592,7 +2592,7 @@ dependencies = [
 [[package]]
 name = "iptv-adapter-cache"
 version = "0.1.0"
-source = "git+https://github.com/ebaah46/iptv-core.git#01776f0410c7410d61f60a19b444913023d07e62"
+source = "git+https://github.com/ebaah46/iptv-core.git#2aeba28a1e5c32e457d9426eaed023c7a7ea04d6"
 dependencies = [
  "anyhow",
  "core",
@@ -2604,7 +2604,7 @@ dependencies = [
 
 [[package]]
 name = "iptv_desktop"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "core",
@@ -5103,7 +5103,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",

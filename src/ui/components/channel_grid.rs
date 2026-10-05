@@ -1,6 +1,7 @@
-use iced::widget::{column, row, scrollable, Scrollable};
+use std::sync::Arc;
+use iced::widget::{column, row, scrollable};
 use iced::{Element, Fill};
-use libcore::domain::Channel;
+use libcore::domain::{Channel, Channels};
 
 use crate::ui::components::channel_card;
 use crate::ui::theme;
@@ -12,7 +13,7 @@ use crate::ui::theme;
 /// `spacing` — gap between cards (horizontal and vertical)  
 /// `on_click` — callback invoked with the channel id when a card is clicked
 pub fn view<Message: 'static + Clone>(
-    channels: &[Channel],
+    channels: Channels,
     columns: usize,
     spacing: f32,
     on_click: impl Fn(String) -> Message + 'static + Clone,
@@ -21,8 +22,8 @@ pub fn view<Message: 'static + Clone>(
     let rows: Vec<Element<'static, Message>> = channels
         .chunks(columns)
         .map(|chunk| {
-            let chunk_data: Vec<(String, &Channel)> =
-                chunk.iter().map(|ch| (ch.id.clone(), ch)).collect();
+            let chunk_data: Vec<(String, Arc<Channel>)> =
+                chunk.iter().map(|ch| (ch.id.clone(), ch.clone())).collect();
             let mut row_children: Vec<Element<'static, Message>> = Vec::with_capacity(chunk_data.len());
             for (id, ch) in chunk_data {
                 let cb = on_click.clone();
@@ -39,7 +40,7 @@ pub fn view<Message: 'static + Clone>(
 ///
 /// Same parameters as [`view`], but wraps the grid in a vertical scrollable.
 pub fn scrollable_view<Message: 'static + Clone>(
-    channels: &[Channel],
+    channels: Channels,
     columns: usize,
     spacing: f32,
     on_click: impl Fn(String) -> Message + 'static + Clone,
@@ -54,7 +55,7 @@ pub fn scrollable_view<Message: 'static + Clone>(
 ///
 /// `available_width` — the width available for the grid (used to calculate columns).
 pub fn auto_view<Message: 'static + Clone>(
-    channels: &[Channel],
+    channels: Channels,
     available_width: f32,
     spacing: f32,
     on_click: impl Fn(String) -> Message + 'static + Clone,

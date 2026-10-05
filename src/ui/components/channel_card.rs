@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use iced::widget::{button, column, container, text};
 use iced::{Color, Element, Fill, Font};
 
@@ -18,7 +19,7 @@ fn color_from_name(name: &str) -> Color {
 
 /// Renders a single channel card.
 pub fn view<Message: 'static + Clone>(
-    channel: &Channel,
+    channel: Arc<Channel>,
     on_selected: impl Fn(String) -> Message + 'static + Clone,
 ) -> Element<'static, Message> {
     let channel_name = channel.name.clone();

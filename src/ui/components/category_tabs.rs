@@ -1,13 +1,13 @@
 use iced::widget::{container, row, scrollable, text};
 use iced::{Element, Fill};
 
-use libcore::domain::Category;
+use libcore::domain::Categories;
 
 use crate::ui::theme;
 
 /// Renders a horizontal row of category filter tabs.
 pub fn view<Message: 'static + Clone>(
-    categories: &[Category],
+    categories: &Categories,
     top_count: usize,
     active_category: &str,
     on_selected: impl Fn(String) -> Message + 'static + Clone,

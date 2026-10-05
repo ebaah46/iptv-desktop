@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use iced::{futures::stream, futures::Stream, Element, Subscription, Task, Theme};
 
 use libcore::facade::{CoreFacade, IptvFacade};
+use log::info;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc;
 use crate::player::commands::{PlayerCommand, PlayerEvent};
@@ -102,9 +103,11 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             )
         },
         Message::HomeReady => {
-            state.home.channel_data = Arc::new(state.facade.catalog_service.get_all());
+            state.home.channel_data = Arc::new(state.facade.catalog_service.get_active_channels());
             state.home.category_data =  state.facade.catalog_service.get_categories();
             state.home.countries_data = state.facade.catalog_service.get_countries();
+            state.home.channel_count = state.home.channel_data.len();
+            info!("[player] # Channels: {}", state.home.channel_count);
             state.home.loading = false;
             Task::none()
         },

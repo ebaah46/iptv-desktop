@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use iced::widget::{column, container, row, scrollable, text, Scrollable};
+use iced::widget::{column, container, row, scrollable, text};
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::{Center, Element, Fill, Font, Task};
 use iced_aw::widgets::spinner::Spinner;
 use libcore::domain::{Categories, Channels, Countries};
 use libcore::facade::IptvFacade;
-use log::info;
 use crate::ui::components::category_tabs;
 use crate::ui::components::channel_card;
 use crate::ui::components::channel_grid;
@@ -177,7 +176,7 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
 
         // Use 5 columns for the grid — adjust as desired.
         let grid = channel_grid::view(
-            &results,
+            results,
             5,
             theme::SPACING_MD,
             |id| HomeMessage::ChannelClicked(id),
@@ -211,7 +210,7 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             .take(featured_count)
             .map(|ch| {
                 let id = ch.id.clone();
-                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
+                channel_card::view(ch.clone(), move |_| HomeMessage::ChannelClicked(id.clone()))
             })
             .collect();
 
@@ -232,7 +231,7 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             .take(popular_count)
             .map(|ch| {
                 let id = ch.id.clone();
-                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
+                channel_card::view(ch.clone(), move |_| HomeMessage::ChannelClicked(id.clone()))
             })
             .collect();
 
