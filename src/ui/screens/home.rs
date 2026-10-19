@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
-use iced::widget::{column, container, row, scrollable, text, Scrollable};
+use iced::widget::{button, column, container, row, scrollable, text};
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::{Center, Element, Fill, Font, Task};
 use iced_aw::widgets::spinner::Spinner;
-use libcore::domain::{Categories, Channels, Countries};
+use libcore::domain::{Categories, Countries};
 use libcore::facade::IptvFacade;
-use log::info;
 use crate::ui::components::category_tabs;
-use crate::ui::components::channel_card;
 use crate::ui::components::channel_grid;
 use crate::ui::components::sidebar::{self, SidebarState};
 use crate::ui::components::status_bar::{self, StatusBarData};
 use crate::ui::components::top_bar;
 use crate::ui::theme;
+use crate::ui_model::ChannelItems;
 
 /// Messages handled by the home screen.
 #[derive(Debug, Clone)]
@@ -21,9 +20,11 @@ pub enum HomeMessage {
     CategorySelected(String),
     TabSelected(String),
     SearchChanged(String),
-    SearchResultsReady(String, Channels),
+    SearchResultsReady(String, ChannelItems),
     DebounceExpired(u64, String),
     ChannelClicked(String),
+    /// Toggles the single category grid between the 8-card preview and all items.
+    ShowAllToggled(bool),
 }
 
 /// State consumed by the home screen.
@@ -34,13 +35,17 @@ pub struct HomeState {
     pub top_bar_active_tab: String,
     pub top_bar_search_query: String,
     pub status_bar: StatusBarData,
-    pub channel_data: Arc<Channels>,
+    pub channel_data: Arc<ChannelItems>,
     pub category_data: Categories,
     pub countries_data: Countries,
     pub loading: bool,
     pub active_category: String,
     /// Channels matching the current search query (empty if no search active).
-    pub search_results: Channels,
+    pub search_results: ChannelItems,
+    /// Channels filtered by the active category (None = show all channels)
+    pub filtered_channels: Option<ChannelItems>,
+    /// Whether the single category grid shows all items or the 8-card preview.
+    pub show_all_channels: bool,
     /// pending_search prevents race conditions when user types quickly
     pending_search: String,
     /// search id for identifying each query string on each key stroke
@@ -69,11 +74,37 @@ pub fn update(
             if let Some(index) = state.sidebar.items.iter().position(|i| *i == name) {
                 state.sidebar.active_index = index;
             }
-            state.active_category = name;
             Task::none()
         }
         HomeMessage::TabSelected(tab) => {
-            state.top_bar_active_tab = tab;
+            state.top_bar_active_tab = tab.clone();
+            state.active_category = tab.clone();
+            // Switching category resets the "show all" expansion.
+            state.show_all_channels = false;
+
+            // Filter channels based on active category
+            if tab == "All" {
+                state.filtered_channels = None;
+            } else {
+                // Find the category ID that matches the name
+                let category_id = state
+                    .category_data
+                    .iter()
+                    .find(|cat| cat.name == tab)
+                    .map(|cat| cat.id.clone());
+
+                if let Some(cat_id) = category_id {
+                    let filtered: ChannelItems = state
+                        .channel_data
+                        .iter()
+                        .filter(|ch| ch.category_ids().contains(&cat_id))
+                        .cloned()
+                        .collect();
+                    state.filtered_channels = Some(filtered);
+                } else {
+                    state.filtered_channels = None;
+                }
+            }
             Task::none()
         }
         HomeMessage::SearchChanged(query) => {
@@ -105,11 +136,11 @@ pub fn update(
             let query_string = query.clone();
             Task::perform(
                 tokio::task::spawn_blocking(move || {
-                    let results: Channels = data
+                    let results: ChannelItems = data
                         .iter()
                         .filter(|ch| {
-                            ch.name.to_ascii_lowercase().contains(&query_string)
-                                || ch.alt_names.iter().any(|a| a.to_ascii_lowercase().contains(&query_string))
+                            ch.name().to_ascii_lowercase().contains(&query_string)
+                                || ch.alt_names().iter().any(|a| a.to_ascii_lowercase().contains(&query_string))
                         })
                         .cloned()
                         .collect();
@@ -128,6 +159,10 @@ pub fn update(
         }
         HomeMessage::ChannelClicked(_id) => {
             // Navigation to player will be handled at the app level.
+            Task::none()
+        }
+        HomeMessage::ShowAllToggled(show) => {
+            state.show_all_channels = show;
             Task::none()
         }
     }
@@ -177,7 +212,7 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
 
         // Use 5 columns for the grid — adjust as desired.
         let grid = channel_grid::view(
-            &results,
+            results,
             5,
             theme::SPACING_MD,
             |id| HomeMessage::ChannelClicked(id),
@@ -197,80 +232,69 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             .height(Fill)
             .into()
     } else {
-        // ── Featured section ────────────────────────────────────────────
-        let featured_start = state
-            .channel_data
-            .len()
-            .saturating_sub(10);
-        let featured_count = state.channel_data.len().min(10);
-
-        let featured_cards: Vec<Element<'_, HomeMessage>> = state
-            .channel_data
-            .iter()
-            .skip(featured_start)
-            .take(featured_count)
-            .map(|ch| {
-                let id = ch.id.clone();
-                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
-            })
-            .collect();
-
         // ── Category tabs ──────────────────────────────────────────────
         let top_category_count = state.category_data.len().min(10);
         let cat_tabs = scrollable(category_tabs::view(
             &state.category_data,
             top_category_count,
             &state.active_category,
-            |name| HomeMessage::CategorySelected(name),
+            |name| HomeMessage::TabSelected(name),
         )).direction(Direction::Horizontal(Scrollbar::hidden()));
 
-        // ── Popular section ─────────────────────────────────────────────
-        let popular_count = state.channel_data.len().min(10);
-        let popular_cards: Vec<Element<'_, HomeMessage>> = state
-            .channel_data
-            .iter()
-            .take(popular_count)
-            .map(|ch| {
-                let id = ch.id.clone();
-                channel_card::view(ch, move |_| HomeMessage::ChannelClicked(id.clone()))
-            })
-            .collect();
+        // Page title for the currently active category.
+        let page_title = text(&state.active_category)
+            .size(theme::FONT_SIZE_XL)
+            .color(theme::TEXT_PRIMARY)
+            .font(Font {
+                weight: iced::font::Weight::Bold,
+                ..Font::DEFAULT
+            });
 
-        let featured_section = column![
-            text("Featured Channels")
-                .size(theme::FONT_SIZE_XL)
-                .color(theme::TEXT_PRIMARY)
-                .font(Font {
-                    weight: iced::font::Weight::Bold,
-                    ..Font::DEFAULT
-                }),
-            scrollable(row(featured_cards).spacing(theme::SPACING_MD))
-                .direction(Direction::Horizontal(Scrollbar::hidden()))
-                .width(Fill)
-                .height(theme::CHANNEL_CARD_HEIGHT + 20.0),
-        ]
-        .spacing(theme::SPACING_MD);
+        // Determine the active channel set: the selected category, or all.
+        let visible: ChannelItems = if let Some(filtered) = state.filtered_channels.as_ref() {
+            filtered.clone()
+        } else {
+            state.channel_data.iter().cloned().collect()
+        };
 
-        let popular_section = column![
-            text("Popular Channels")
-                .size(theme::FONT_SIZE_XL)
-                .color(theme::TEXT_PRIMARY)
-                .font(Font {
-                    weight: iced::font::Weight::Bold,
-                    ..Font::DEFAULT
-                }),
-            scrollable(row(popular_cards).spacing(theme::SPACING_MD))
-                .direction(Direction::Horizontal(Scrollbar::hidden()))
-                .width(Fill)
-                .height(theme::CHANNEL_CARD_HEIGHT + 20.0),
-        ]
-        .spacing(theme::SPACING_MD);
+        // Single list: show up to PREVIEW_LIMIT cards, togglable to reveal all.
+        let preview_limit = 10;
+        let is_truncated = visible.len() > preview_limit;
+        let shown: ChannelItems = if state.show_all_channels || !is_truncated {
+            visible.clone()
+        } else {
+            visible.iter().take(preview_limit).cloned().collect()
+        };
 
-        let body = column![featured_section, cat_tabs, popular_section]
+        let grid = channel_grid::view(
+            shown,
+            4,
+            theme::SPACING_MD,
+            |id| HomeMessage::ChannelClicked(id),
+        );
+
+        // Compose the body, conditionally appending a "Show all / less" toggle.
+        let mut body_children: Vec<Element<'_, HomeMessage>> = Vec::new();
+        body_children.push(cat_tabs.into());
+        body_children.push(page_title.into());
+        body_children.push(grid.into());
+        if is_truncated {
+            let label = if state.show_all_channels {
+                "Show Less".into()
+            } else {
+                format!("Show All ({})", visible.len())
+            };
+            body_children.push(
+                button(text(label))
+                    .on_press(HomeMessage::ShowAllToggled(!state.show_all_channels))
+                    .into(),
+            );
+        }
+
+        let body = column(body_children)
             .spacing(theme::SPACING_XL)
             .padding(theme::SPACING_XL)
             .align_x(Center);
-
 
         scrollable(body)
             .width(Fill)

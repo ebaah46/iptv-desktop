@@ -1,9 +1,15 @@
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use iced::{futures::stream, futures::Stream, Element, Subscription, Task, Theme};
+use iced::widget::image::Handle;
 
+use libcore::domain::Logo;
 use libcore::facade::{CoreFacade, IptvFacade};
+use log::info;
+use reqwest::Method;
+use reqwest::blocking::Client as HttpClient;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc;
 use crate::player::commands::{PlayerCommand, PlayerEvent};
@@ -12,6 +18,32 @@ use crate::ui::page::Page;
 use crate::ui::screens::home::{self, HomeMessage, HomeState};
 use crate::ui::screens::player::{self, PlayerState};
 use crate::ui::screens::player::PlayerMessage::{ApplyLoad, ApplyPause, ApplyPlay, ApplySeek, ApplyStop};
+use crate::ui_model::{ChannelItem, ChannelItems};
+
+/// Downloads and decodes a channel logo at the given URL into an image handle.
+fn fetch_logo_handle(url: &str) -> Option<Handle> {
+    if url.is_empty() {
+        return None;
+    }
+    let client = HttpClient::new();
+    client
+        .request(Method::GET, url)
+        .send()
+        .ok()
+        .and_then(|r| r.bytes().ok())
+        .map(|bytes| Handle::from_bytes(bytes))
+}
+
+/// Rebuilds the channel items, attaching a decoded logo handle to each when the
+/// logo could be fetched. Items without a logo are cloned as-is.
+fn load_logos(items: &Arc<ChannelItems>) -> ChannelItems {
+    items.iter().map(|item| {
+        match fetch_logo_handle(item.logo_url()) {
+            Some(handle) => Arc::new(item.with_logo_handle(handle)),
+            None => item.clone(),
+        }
+    }).collect()
+}
 
 /// Root application state.
 pub struct App {
@@ -102,10 +134,41 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             )
         },
         Message::HomeReady => {
-            state.home.channel_data = Arc::new(state.facade.catalog_service.get_all());
+            let channels = state.facade.catalog_service.get_active_channels();
+            let logos = state.facade.catalog_service.get_logos();
+
+            state.home.channel_count = channels.len();
+
+            // Index logos by channel id for O(1) lookup when pairing items.
+            let mut logo_index: HashMap<String, Arc<Logo>> = HashMap::new();
+            for l in logos.iter() {
+                logo_index.insert(l.channel.clone().into(), l.clone());
+            }
+
+            let mut items: ChannelItems = Vec::new();
+            for ch in channels.iter() {
+                if let Some(logo) = logo_index.get(&ch.id) {
+                    items.push(Arc::new(ChannelItem::new(ch.clone(), logo.clone())));
+                }
+            }
+
+            state.home.channel_data = Arc::new(items);
             state.home.category_data =  state.facade.catalog_service.get_categories();
             state.home.countries_data = state.facade.catalog_service.get_countries();
+            info!("[player] # Channels: {}", state.home.channel_count);
             state.home.loading = false;
+
+            // Fetch and decode logos in the background; re-render when ready.
+            let items_for_logos = state.home.channel_data.clone();
+            Task::perform(
+                tokio::task::spawn_blocking(move || {
+                    Message::LogosReady(load_logos(&items_for_logos))
+                }),
+                |res| res.unwrap_or_else(|_| Message::Unknown),
+            )
+        },
+        Message::LogosReady(items) => {
+            state.home.channel_data = Arc::new(items);
             Task::none()
         },
 

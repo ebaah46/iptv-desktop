@@ -2,12 +2,12 @@ pub mod config;
 pub mod utils;
 pub mod player;
 mod ui;
+pub mod ui_model;
 
 pub use config::AppConfig;
 pub use player::GstPlayerController;
 
 use std::sync::Arc;
-use std::time::Duration;
 use libcore::facade::IptvFacade;
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
