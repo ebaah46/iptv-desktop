@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use iced::widget::{button, column, container, text};
 use iced::{Center, Element, Fill, Padding, Task};
+use iced_aw::widgets::spinner::Spinner;
 use iced_video_player::{Error, Video, VideoPlayer};
 use libcore::domain::Stream;
 use libcore::facade::{CoreFacade, IptvFacade};
@@ -214,9 +215,9 @@ pub fn view<'a>(
     // ── Control overlay (centered on top of video) ──────────────────────
     let overlay: Element<'a, PlayerMessage> = if state.is_loading {
         container(
-            text("Loading stream...")
-                .size(theme::FONT_SIZE_LG)
-                .color(theme::TEXT_SECONDARY),
+            Spinner::default()
+                .width(40)
+                .height(40),
         )
         .center_x(Fill)
         .center_y(Fill)
