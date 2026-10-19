@@ -49,5 +49,5 @@ pub const FONT_SIZE_XL: f32 = 20.0;
 pub const SIDEBAR_WIDTH: f32 = 180.0;
 pub const TOPBAR_HEIGHT: f32 = 52.0;
 pub const STATUSBAR_HEIGHT: f32 = 48.0;
-pub const CHANNEL_CARD_WIDTH: f32 = 150.0;
-pub const CHANNEL_CARD_HEIGHT: f32 = 100.0;
+pub const CHANNEL_CARD_WIDTH: f32 = 180.0;
+pub const CHANNEL_CARD_HEIGHT: f32 = 210.0;
