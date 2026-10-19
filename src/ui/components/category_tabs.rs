@@ -42,7 +42,7 @@ fn tab<Message: 'static + Clone>(
     on_press: Message,
 ) -> Element<'static, Message> {
     let label = text(label)
-        .size(theme::FONT_SIZE_SM)
+        .size(theme::FONT_SIZE_MD)
         .color(if is_active {
             iced::Color::WHITE
         } else {
@@ -57,7 +57,13 @@ fn tab<Message: 'static + Clone>(
             iced::Font::DEFAULT
         });
 
-    let btn = iced::widget::button(label)
+    let btn = iced::widget::button(
+        container(label)
+            .width(Fill)
+            .height(Fill)
+            .center_x(Fill)
+            .center_y(Fill),
+    )
         .on_press(on_press)
         .width(100)
         .height(32)
