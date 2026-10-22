@@ -27,6 +27,17 @@ pub const BORDER_COLOR: Color = Color::from_rgb(0.165, 0.165, 0.243); // #2a2a3e
 pub const PROGRESS_BG: Color = Color::from_rgb(0.165, 0.165, 0.243);  // #2a2a3e
 pub const PROGRESS_FILL: Color = Color::from_rgb(0.102, 0.451, 0.910);// #1a73e8
 
+// ── Player controls ─────────────────────────────────────────────────
+/// Opaque surface of the control bar.
+pub const CONTROLS_BG: Color = Color::from_rgb(0.07, 0.07, 0.09);     // #121217
+/// Radius of the play/pause and transport buttons.
+pub const CONTROLS_RADIUS: f32 = 20.0;
+/// Icon size for player controls
+pub const CONTROL_ICON_BOX: f32 = 36.0;
+/// Rendered size of the icon glyph inside its box. Keep it a few px smaller
+/// than `CONTROL_ICON_BOX` so the glyph never touches the button edges.
+pub const CONTROL_ICON_GLYPH: f32 = 20.0;
+
 // ── Spacing ─────────────────────────────────────────────────────────
 pub const SPACING_XS: f32 = 4.0;
 pub const SPACING_SM: f32 = 8.0;

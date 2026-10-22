@@ -11,7 +11,7 @@ libcore = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_api = {package = "iptv-adapter-api", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_cache = {package = "iptv-adapter-cache", git = "https://github.com/ebaah46/iptv-core.git"}
 anyhow = "1.0.104"
-iced = { version = "0.14.0", features = ["tokio", "image"] }
+iced = { version = "0.14.0", features = ["tokio", "image", "svg"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync"] }
 reqwest = "0.13.5"
 iced_aw = { version = "0.14.1", features = ["full"], default-features = false }

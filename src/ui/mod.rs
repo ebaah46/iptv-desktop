@@ -1,5 +1,6 @@
 pub mod app;
 pub mod components;
+pub mod logo_cache;
 pub mod message;
 pub mod page;
 pub mod screens;

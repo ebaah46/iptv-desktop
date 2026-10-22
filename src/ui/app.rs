@@ -3,13 +3,11 @@ use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use iced::{futures::stream, futures::Stream, Element, Subscription, Task, Theme};
-use iced::widget::image::Handle;
+use futures::StreamExt;
 
 use libcore::domain::Logo;
 use libcore::facade::{CoreFacade, IptvFacade};
 use log::info;
-use reqwest::Method;
-use reqwest::blocking::Client as HttpClient;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc;
 use crate::player::commands::{PlayerCommand, PlayerEvent};
@@ -17,32 +15,74 @@ use crate::ui::message::Message;
 use crate::ui::page::Page;
 use crate::ui::screens::home::{self, HomeMessage, HomeState};
 use crate::ui::screens::player::{self, PlayerState};
-use crate::ui::screens::player::PlayerMessage::{ApplyLoad, ApplyPause, ApplyPlay, ApplySeek, ApplyStop};
-use crate::ui_model::{ChannelItem, ChannelItems};
+use crate::ui::screens::player::PlayerMessage::{ApplyLoad, ApplyPause, ApplyPlay, ApplySeek, ApplyStop, Tick as PlayerTick};
+use crate::ui::logo_cache::LogoCache;
+use crate::ui_model::{ChannelItem, ChannelItems, LogoImage};
 
-/// Downloads and decodes a channel logo at the given URL into an image handle.
-fn fetch_logo_handle(url: &str) -> Option<Handle> {
-    if url.is_empty() {
-        return None;
+/// Number of logo downloads allowed to run in parallel.
+const LOGO_CONCURRENCY: usize = 8;
+/// Number of finished downloads grouped into a single progressive update.
+const LOGO_BATCH_SIZE: usize = 20;
+
+/// Wraps downloaded logo bytes in the appropriate iced handle based on format.
+fn make_logo_image(format: &str, bytes: Vec<u8>) -> Option<LogoImage> {
+    if format.eq_ignore_ascii_case("svg") {
+        Some(LogoImage::Svg(iced::widget::svg::Handle::from_memory(bytes)))
+    } else {
+        Some(LogoImage::Raster(iced::widget::image::Handle::from_bytes(bytes)))
     }
-    let client = HttpClient::new();
-    client
-        .request(Method::GET, url)
-        .send()
-        .ok()
-        .and_then(|r| r.bytes().ok())
-        .map(|bytes| Handle::from_bytes(bytes))
 }
 
-/// Rebuilds the channel items, attaching a decoded logo handle to each when the
-/// logo could be fetched. Items without a logo are cloned as-is.
-fn load_logos(items: &Arc<ChannelItems>) -> ChannelItems {
-    items.iter().map(|item| {
-        match fetch_logo_handle(item.logo_url()) {
-            Some(handle) => Arc::new(item.with_logo_handle(handle)),
-            None => item.clone(),
+/// Resolves the on-disk logo cache root (application data dir / `logos`).
+fn logo_cache_root() -> Option<std::path::PathBuf> {
+    let cfg = crate::config::AppConfig::load().ok()?;
+    cfg.ensure_data_path()
+}
+
+/// Downloads (or loads from cache) a single channel's logo, returning its id
+/// and the decoded handle (`None` on any failure or a missing url).
+fn fetch_logo(
+    item: &Arc<ChannelItem>,
+    client: &reqwest::blocking::Client,
+    cache: &LogoCache,
+) -> (String, Option<LogoImage>) {
+    let id = item.id().to_string();
+    let url = item.logo_url();
+    let format = item.logo_format().to_string();
+
+    if url.is_empty() {
+        return (id, None);
+    }
+
+    // Serve from disk when available; otherwise download once and cache it so
+    // subsequent runs (and re-visits after a refresh) are instant.
+    let bytes = match cache.get(url) {
+        Some(bytes) => Some(bytes),
+        None => {
+            let fetched = client
+                .get(url)
+                .send()
+                .ok()
+                .and_then(|r| r.bytes().ok())
+                .map(|bytes| bytes.to_vec());
+            if let Some(bytes) = fetched.as_ref() {
+                cache.put(url, bytes);
+            }
+            fetched
         }
-    }).collect()
+    };
+
+    (id, bytes.and_then(|b| make_logo_image(&format, b)))
+}
+
+/// Merges a downloaded logo batch into a channel list by channel id.
+fn apply_logo_batch(batch: &[(String, Option<LogoImage>)], data: &mut ChannelItems) {
+    for (id, image) in batch {
+        let Some(image) = image else { continue };
+        if let Some(idx) = data.iter().position(|item| item.id() == id.as_str()) {
+            data[idx] = Arc::new(data[idx].with_logo_handle(image.clone()));
+        }
+    }
 }
 
 /// Root application state.
@@ -72,7 +112,17 @@ impl App {
             rx_slot: self.command_rx.clone(),
         };
 
-        Subscription::run_with(id, Self::player_commands_stream)
+        // NOTE: keep this recipe STABLE on every page. Changing the shape of
+        // the returned subscription (e.g. toggling the ticker on/off with the
+        // page) makes iced tear down and re-create the commands subscription,
+        // whose receiver has already been taken - leaving an empty stream so
+        // PlayerCommand::Load/Play/Stop/Seek never reach the UI (channels then
+        // never play). Always return the same recipe regardless of page.
+        let commands = Subscription::run_with(id, Self::player_commands_stream);
+
+        let ticker = iced::time::every(std::time::Duration::from_millis(500))
+            .map(|_| Message::Player(PlayerTick));
+        Subscription::batch([commands, ticker])
     }
 
     fn player_commands_stream(
@@ -158,17 +208,56 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             info!("[player] # Channels: {}", state.home.channel_count);
             state.home.loading = false;
 
-            // Fetch and decode logos in the background; re-render when ready.
-            let items_for_logos = state.home.channel_data.clone();
-            Task::perform(
-                tokio::task::spawn_blocking(move || {
-                    Message::LogosReady(load_logos(&items_for_logos))
-                }),
-                |res| res.unwrap_or_else(|_| Message::Unknown),
-            )
+            // Fetch and decode logos in the background with a bounded number of
+            // concurrent downloads against a single shared HTTP client (for
+            // connection reuse). Results are streamed to the UI in small
+            // progressive batches so the grid fills in as downloads complete.
+            let client = Arc::new(
+                reqwest::blocking::Client::builder()
+                    .timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .expect("failed to build HTTP client"),
+            );
+            let cache = LogoCache::new(logo_cache_root());
+
+            let items_with_logos: Vec<Arc<ChannelItem>> = state
+                .home
+                .channel_data
+                .iter()
+                .filter(|item| item.has_logo())
+                .cloned()
+                .collect();
+
+            let stream = futures::stream::iter(items_with_logos)
+                .map(move |item| {
+                    let client = client.clone();
+                    let cache = cache.clone();
+                    tokio::task::spawn_blocking(move || fetch_logo(&item, &client, &cache))
+                })
+                .buffer_unordered(LOGO_CONCURRENCY)
+                .map(|res| res.unwrap_or_else(|_| (String::new(), None)))
+                .ready_chunks(LOGO_BATCH_SIZE);
+
+            Task::run(stream, Message::LogoBatch)
         },
-        Message::LogosReady(items) => {
-            state.home.channel_data = Arc::new(items);
+        Message::LogoBatch(batch) => {
+            // Attach decoded handles to the master channel list, and to any
+            // search/filter snapshots that were captured before the logos
+            // finished loading, so logos appear everywhere.
+            let mut data = (*state.home.channel_data).clone();
+            apply_logo_batch(&batch, &mut data);
+            state.home.channel_data = Arc::new(data);
+
+            let mut results = state.home.search_results.clone();
+            apply_logo_batch(&batch, &mut results);
+            state.home.search_results = results;
+
+            if let Some(filtered) = state.home.filtered_channels.as_mut() {
+                let mut filtered = filtered.clone();
+                apply_logo_batch(&batch, &mut filtered);
+                state.home.filtered_channels = Some(filtered);
+            }
+
             Task::none()
         },
 
