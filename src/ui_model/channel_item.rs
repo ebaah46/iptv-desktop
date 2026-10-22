@@ -2,6 +2,19 @@ use std::sync::Arc;
 
 use libcore::domain::{Channel, Logo};
 
+/// A decoded channel logo ready to be rendered.
+///
+/// Keeps the two distinct handle types iced exposes — raster images (png, jpg,
+/// gif, webp, …) and vector images (SVG) — so the UI can render whichever the
+/// source served.
+#[derive(Debug, Clone)]
+pub enum LogoImage {
+    /// A raster image decoded at render time from raw bytes.
+    Raster(iced::widget::image::Handle),
+    /// A vector (SVG) image decoded at render time from raw bytes.
+    Svg(iced::widget::svg::Handle),
+}
+
 /// A channel together with its associated logo, as consumed by the UI layer.
 ///
 /// UI components interact only through the typed getters below and never touch
@@ -10,8 +23,8 @@ use libcore::domain::{Channel, Logo};
 pub struct ChannelItem {
     channel: Arc<Channel>,
     logo: Arc<Logo>,
-    /// Decoded image handle for the channel logo (None until fetched/decoded).
-    logo_handle: Option<iced::widget::image::Handle>,
+    /// Decoded logo handle for the channel (None until fetched/decoded).
+    logo_handle: Option<LogoImage>,
 }
 
 /// A collection of channel items used across the UI.
@@ -93,17 +106,17 @@ impl ChannelItem {
     }
 
     /// The decoded image handle for this channel's logo, if loaded.
-    pub fn logo_handle(&self) -> &Option<iced::widget::image::Handle> {
+    pub fn logo_handle(&self) -> &Option<LogoImage> {
         &self.logo_handle
     }
 
     /// Attaches a decoded image handle for this channel's logo.
-    pub fn set_logo_handle(mut self, handle: iced::widget::image::Handle) {
+    pub fn set_logo_handle(mut self, handle: LogoImage) {
         self.logo_handle = Some(handle);
     }
 
     /// Returns a new item identical to this one but carrying the given logo handle.
-    pub fn with_logo_handle(&self, handle: iced::widget::image::Handle) -> Self {
+    pub fn with_logo_handle(&self, handle: LogoImage) -> Self {
         Self {
             channel: self.channel.clone(),
             logo: self.logo.clone(),

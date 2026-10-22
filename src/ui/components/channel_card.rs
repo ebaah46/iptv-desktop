@@ -4,7 +4,7 @@ use iced::{Element, Fill, Font};
 use iced::Length::Fixed;
 
 use crate::ui::theme;
-use crate::ui_model::ChannelItem;
+use crate::ui_model::{ChannelItem, LogoImage};
 
 /// Renders a single channel card.
 pub fn view<Message: 'static + Clone>(
@@ -17,14 +17,18 @@ pub fn view<Message: 'static + Clone>(
     // The logo image is sized to at least 60% of the card's height. A missing
     // or empty logo simply renders as reserved blank space (no fallback).
     let logo_size = theme::CHANNEL_CARD_HEIGHT * 0.6;
-    let logo_content: Element<'_, Message> = if let Some(handle) = item.logo_handle().as_ref() {
-        iced::widget::image::viewer(handle.clone())
+    let logo_content: Element<'static, Message> = match item.logo_handle().as_ref() {
+        Some(LogoImage::Raster(handle)) => iced::widget::image::viewer(handle.clone())
             .width(logo_size)
             .height(logo_size)
             .content_fit(iced::ContentFit::Contain)
-            .into()
-    } else {
-        container(text("")).width(logo_size).height(logo_size).into()
+            .into(),
+        Some(LogoImage::Svg(handle)) => iced::widget::svg::Svg::new(handle.clone())
+            .width(logo_size)
+            .height(logo_size)
+            .content_fit(iced::ContentFit::Contain)
+            .into(),
+        None => container(text("")).width(logo_size).height(logo_size).into(),
     };
     let logo = container(logo_content)
         .width(logo_size)
