@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use libcore::domain::{Channel, Logo};
 
@@ -24,7 +24,7 @@ pub struct ChannelItem {
     channel: Arc<Channel>,
     logo: Arc<Logo>,
     /// Decoded logo handle for the channel (None until fetched/decoded).
-    logo_handle: Option<LogoImage>,
+    logo_handle: Arc<OnceLock<LogoImage>>,
 }
 
 /// A collection of channel items used across the UI.
@@ -36,7 +36,7 @@ impl ChannelItem {
         Self {
             channel,
             logo,
-            logo_handle: None,
+            logo_handle: Arc::new(OnceLock::new()),
         }
     }
 
@@ -106,21 +106,13 @@ impl ChannelItem {
     }
 
     /// The decoded image handle for this channel's logo, if loaded.
-    pub fn logo_handle(&self) -> &Option<LogoImage> {
-        &self.logo_handle
+    pub fn logo_handle(&self) -> Option<&LogoImage> {
+        self.logo_handle.get()
     }
 
     /// Attaches a decoded image handle for this channel's logo.
-    pub fn set_logo_handle(mut self, handle: LogoImage) {
-        self.logo_handle = Some(handle);
+    pub fn set_logo_handle(&self, handle: LogoImage) -> bool {
+        self.logo_handle.set(handle).is_ok()
     }
 
-    /// Returns a new item identical to this one but carrying the given logo handle.
-    pub fn with_logo_handle(&self, handle: LogoImage) -> Self {
-        Self {
-            channel: self.channel.clone(),
-            logo: self.logo.clone(),
-            logo_handle: Some(handle),
-        }
-    }
 }
