@@ -242,22 +242,9 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
         },
         Message::LogoBatch(batch) => {
             // Attach decoded handles to the master channel list, and to any
-            // search/filter snapshots that were captured before the logos
-            // finished loading, so logos appear everywhere.
-            let mut data = (*state.home.channel_data).clone();
-            apply_logo_batch(&batch, &mut data);
-            state.home.channel_data = Arc::new(data);
-
-            let mut results = state.home.search_results.clone();
-            apply_logo_batch(&batch, &mut results);
-            state.home.search_results = results;
-
-            if let Some(filtered) = state.home.filtered_channels.as_mut() {
-                let mut filtered = filtered.clone();
-                apply_logo_batch(&batch, &mut filtered);
-                state.home.filtered_channels = Some(filtered);
-            }
-
+            // search/filter snapshots are automatically updated because channel item
+            // now contains pointer to logo
+            merge_logo_batch(&batch, &state.home.channel_data);
             Task::none()
         },
 
