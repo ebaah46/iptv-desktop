@@ -1,6 +1,6 @@
+use futures::StreamExt;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use iced::{futures::stream, futures::Stream, Element, Subscription, Task, Theme};
@@ -9,7 +9,7 @@ use libcore::domain::Logo;
 use libcore::facade::{CoreFacade, IptvFacade};
 use log::info;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use crate::logo::{load_all, LogoLoader, merge_logo_batch};
+use crate::logo::{LogoLoader, merge_logo_batch, LogoPipeline};
 use crate::player::commands::{PlayerCommand, PlayerEvent};
 use crate::ui::message::Message;
 use crate::ui::page::Page;
@@ -26,20 +26,21 @@ pub struct App {
     pub home: HomeState,
     pub player: PlayerState,
     pub command_rx: Arc<Mutex<Option<UnboundedReceiver<PlayerCommand>>>>,
-    pub logo_loader: Arc<LogoLoader>
+    pub logo_pipeline: Arc<LogoPipeline>
 }
 
 impl App {
     pub fn new(facade: Arc<IptvFacade>, command_tx: UnboundedReceiver<PlayerCommand>, event_tx: UnboundedSender<PlayerEvent>) -> Self {
         let mut player = PlayerState::default();
         player.event_tx = Some(event_tx.clone());
+        let logos = Arc::new(LogoPipeline::new(Arc::new(LogoLoader::new(None))));
         Self {
             facade,
             page: Page::Home,
             home: HomeState::new(),
             player,
             command_rx: Arc::new(Mutex::new(Some(command_tx))),
-            logo_loader: Arc::new(LogoLoader::new(None))
+            logo_pipeline: logos
         }
     }
     /// Called repeatedly by iced. Must return a stable, pure recipe.
@@ -57,7 +58,10 @@ impl App {
         } else {
             Subscription::none()
         };
-        Subscription::batch([commands, ticker])
+
+        let logos = Subscription::run_with(LogoPipelineId(self.logo_pipeline.clone()), Self::logo_stream);
+
+        Subscription::batch([commands, ticker, logos])
     }
 
     fn player_commands_stream(
@@ -81,6 +85,10 @@ impl App {
                 .map(|command| (Message::PlayerCommand(command), rx))
         }))
     }
+
+    fn logo_stream(id: &LogoPipelineId) -> Pin<Box<dyn Stream<Item = Message> + Send>> {
+        Box::pin(id.0.clone().batch_stream().map(Message::LogoBatch))
+    }
 }
 
 /// Processes a message and mutates state.
@@ -98,7 +106,7 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
                 state.player.error_message.clear();
                 state.page = Page::Player;
             }
-            home::update(&mut state.home, msg, state.facade.clone())
+            home::update(&mut state.home, msg, state.facade.clone(), state.logo_pipeline.as_ref())
                 .map(Message::Home)
         }
         Message::Player(msg) => {
@@ -143,8 +151,10 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
             info!("[player] # Channels: {}", state.home.channel_count);
             state.home.loading = false;
 
-            let stream = load_all(state.logo_loader.clone(), state.home.channel_data.deref().clone());
-            Task::run(stream, Message::LogoBatch)
+            state.logo_pipeline.enqueue_all(&state.home.prefetch_window());
+
+            // let stream = load_all(state.logo_loader.clone(), state.home.channel_data.deref().clone());
+            Task::none()
         },
         Message::LogoBatch(batch) => {
             // Attach decoded handles to the master channel list, and to any
@@ -203,3 +213,22 @@ impl PartialEq for PlayerCommandsId {
     }
 }
 impl Eq for PlayerCommandsId {}
+
+
+/// Subscription identity for the logo queue; stable across frames because it
+/// hashes the pipeline's address.
+#[derive(Clone)]
+struct LogoPipelineId(Arc<LogoPipeline>);
+
+impl Hash for LogoPipelineId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).hash(state);
+    }
+}
+
+impl PartialEq for LogoPipelineId {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for LogoPipelineId {}

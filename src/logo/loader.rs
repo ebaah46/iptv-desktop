@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
-use std::sync::Arc;
-use futures::{Stream, StreamExt};
 
 use libcore_cache::FileStore;
 use libcore_api::LogoHttpFetcher;
@@ -122,55 +120,32 @@ impl LogoLoader {
     }
 }
 
-
-/// Number of logo loads allowed to run in parallel.
-const CONCURRENCY: usize = 8;
-/// Number of finished loads grouped into a single progressive update.
-const BATCH_SIZE: usize = 12;
-
 /// A batch of loaded logos keyed by channel id; `None` marks a failed load.
 pub type LogoBatch = Vec<(String, Option<LogoImage>)>;
 
-
-/// Streams decoded logos for every item carrying a logo url, in progressive
-/// batches so the grid fills in as loads complete.
-///
-/// Each load runs on a blocking thread (the cache and HTTP client are
-/// synchronous), bounded by [`CONCURRENCY`], against one shared loader.
-pub fn load_all(
-    loader: Arc<LogoLoader>,
-    items: ChannelItems,
-) -> impl Stream<Item = LogoBatch> {
-    futures::stream::iter(items)
-        .filter(|item| futures::future::ready(item.has_logo()))
-        .map(move |item| {
-            let loader = loader.clone();
-            tokio::task::spawn_blocking(move || {
-                let image = loader.load(item.logo_url(), item.logo_format());
-                (item.id().to_string(), image)
-            })
-        })
-        .buffer_unordered(CONCURRENCY)
-        .map(|res| res.unwrap_or_else(|_| (String::new(), None)))
-        .ready_chunks(BATCH_SIZE)
-}
-
-
 /// Merges a loaded batch into a channel list by channel id.
 pub fn merge_logo_batch(batch: &LogoBatch, items: &ChannelItems) {
-    let mut pending: HashMap<&str, &LogoImage> = batch.iter()
-        .filter_map(|(id, image)| image.as_ref().map(|image| (id.as_str(), image))).collect();
+    let mut pending: HashMap<&str, Option<&LogoImage>> = batch
+        .iter()
+        .map(|(id, image)| (id.as_str(), image.as_ref()))
+        .collect();
 
     if pending.is_empty() {
         return;
     }
 
     for item in items.iter() {
-        if let Some(image) = pending.remove(item.id()){
-            item.set_logo_handle(image.clone());
-            if pending.is_empty(){
-                break;
+        let Some(image) = pending.remove(item.id()) else {
+            continue;
+        };
+        match image {
+            None => item.release_logo_request(),
+            Some(img) => {
+                item.set_logo_handle(img.clone());
             }
+        }
+        if pending.is_empty(){
+            break;
         }
     }
 
