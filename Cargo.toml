@@ -1,6 +1,6 @@
 [package]
 name = "iptv_desktop"
-version = "0.3.2"
+version = "0.3.4"
 edition = "2024"
 
 [dependencies]
@@ -20,4 +20,11 @@ iced_video_player = "0.6.0"
 url = "2.5.8"
 log = "0.4.34"
 futures = "0.3.34"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
 
+
+
+[profile.release]
+debug = true             # Keeps debug symbols (maps hex addresses to function names)
+split-debuginfo = "packed" # Ensures symbols are generated into a format the profiler can grab
+strip = "none"           # Guarantees symbols aren't stripped later

@@ -816,8 +816,8 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.3.2"
-source = "git+https://github.com/ebaah46/iptv-core.git#4e1bfd1b230e4fc0de13c4a4ce71bb90fe318b95"
+version = "0.3.3"
+source = "git+https://github.com/ebaah46/iptv-core.git#7b765adef360e208ff7be8e5bc2d994fbe40e645"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2607,8 +2607,8 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "iptv-adapter-api"
-version = "0.2.2"
-source = "git+https://github.com/ebaah46/iptv-core.git#4e1bfd1b230e4fc0de13c4a4ce71bb90fe318b95"
+version = "0.2.3"
+source = "git+https://github.com/ebaah46/iptv-core.git#7b765adef360e208ff7be8e5bc2d994fbe40e645"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2622,7 +2622,7 @@ dependencies = [
 [[package]]
 name = "iptv-adapter-cache"
 version = "0.1.0"
-source = "git+https://github.com/ebaah46/iptv-core.git#4e1bfd1b230e4fc0de13c4a4ce71bb90fe318b95"
+source = "git+https://github.com/ebaah46/iptv-core.git#7b765adef360e208ff7be8e5bc2d994fbe40e645"
 dependencies = [
  "anyhow",
  "core",
@@ -2634,7 +2634,7 @@ dependencies = [
 
 [[package]]
 name = "iptv_desktop"
-version = "0.3.2"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "core",
@@ -2644,6 +2644,7 @@ dependencies = [
  "iced",
  "iced_aw",
  "iced_video_player",
+ "image",
  "iptv-adapter-api",
  "iptv-adapter-cache",
  "log",

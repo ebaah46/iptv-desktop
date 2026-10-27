@@ -3,6 +3,7 @@ pub mod utils;
 pub mod player;
 mod ui;
 pub mod ui_model;
+pub mod logo;
 
 pub use config::AppConfig;
 pub use player::GstPlayerController;
@@ -31,7 +32,7 @@ fn main() -> Res<()> {
     // ── Synchronous initialization (outside tokio runtime) ──────────
     let config = AppConfig::load().expect("Failed to load config");
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
-
+    config.ensure_data_path();
     let cache_path = config
         .cache_db_path()
         .expect("Failed to determine cache database path");

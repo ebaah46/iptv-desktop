@@ -6,6 +6,7 @@ use iced::{Center, Element, Fill, Font, Task};
 use iced_aw::widgets::spinner::Spinner;
 use libcore::domain::{Categories, Countries};
 use libcore::facade::IptvFacade;
+use crate::logo::LogoPipeline;
 use crate::ui::components::category_tabs;
 use crate::ui::components::channel_grid;
 use crate::ui::components::sidebar::{self, SidebarState};
@@ -23,8 +24,8 @@ pub enum HomeMessage {
     SearchResultsReady(String, ChannelItems),
     DebounceExpired(u64, String),
     ChannelClicked(String),
-    /// Toggles the single category grid between the 8-card preview and all items.
-    ShowAllToggled(bool),
+    /// Reveals the next page of the active list (category grid or search results).
+    LoadMore,
 }
 
 /// State consumed by the home screen.
@@ -44,8 +45,9 @@ pub struct HomeState {
     pub search_results: ChannelItems,
     /// Channels filtered by the active category (None = show all channels)
     pub filtered_channels: Option<ChannelItems>,
-    /// Whether the single category grid shows all items or the 8-card preview.
-    pub show_all_channels: bool,
+    /// Pagination cursor: how many cards of the active list are materialised.
+    /// Reset whenever the active list identity changes (tab switch, new search).
+    pub visible_limit: usize,
     /// pending_search prevents race conditions when user types quickly
     pending_search: String,
     /// search id for identifying each query string on each key stroke
@@ -53,13 +55,57 @@ pub struct HomeState {
 }
 
 impl HomeState {
+    pub const PAGE_SIZE: usize = 15;
     pub fn new() -> Self {
         Self {
             top_bar_active_tab: "Home".into(),
             active_category: "All".into(),
             loading: true,
+            visible_limit: Self::PAGE_SIZE,
             ..Self::default()
         }
+    }
+
+    /// The slice of the catalog backing the active view — the category-filtered
+    /// list when one is selected, otherwise the whole catalog.
+    fn active_source(&self) -> &ChannelItems {
+        self.filtered_channels.as_ref().unwrap_or(&self.channel_data)
+    }
+
+    /// Total number of channels behind the active list.
+    pub fn active_len(&self) -> usize {
+        self.active_source().len()
+    }
+
+    /// The channels currently materialised on screen. Only this slice is handed
+    /// to the grid and to the logo pipeline.
+    pub fn window(&self, limit: usize) -> ChannelItems {
+        self.active_source().iter().take(limit).cloned().collect()
+    }
+
+    /// Channels to render right now.
+    pub fn visible_window(&self) -> ChannelItems {
+        self.window(self.visible_limit)
+    }
+
+    /// Channels whose logos should be warm by the time the user asks for the
+    /// next page (one page ahead).
+    pub fn prefetch_window(&self) -> ChannelItems {
+        self.window(self.visible_limit + Self::PAGE_SIZE)
+    }
+
+    /// Whether the active list has pages left to reveal.
+    pub fn has_more(&self) -> bool {
+        self.visible_limit < self.active_len()
+    }
+
+    /// The search-result window, paginated by the same cursor.
+    pub fn visible_search_results(&self) -> ChannelItems {
+        self.search_results
+            .iter()
+            .take(self.visible_limit)
+            .cloned()
+            .collect()
     }
 }
 
@@ -68,6 +114,7 @@ pub fn update(
     state: &mut HomeState,
     message: HomeMessage,
     facade: Arc<IptvFacade>,
+    logos: &LogoPipeline,
 ) -> Task<HomeMessage> {
     match message {
         HomeMessage::CategorySelected(name) => {
@@ -79,8 +126,7 @@ pub fn update(
         HomeMessage::TabSelected(tab) => {
             state.top_bar_active_tab = tab.clone();
             state.active_category = tab.clone();
-            // Switching category resets the "show all" expansion.
-            state.show_all_channels = false;
+            state.visible_limit = HomeState::PAGE_SIZE;
 
             // Filter channels based on active category
             if tab == "All" {
@@ -105,6 +151,7 @@ pub fn update(
                     state.filtered_channels = None;
                 }
             }
+            logos.enqueue_all(&state.prefetch_window());
             Task::none()
         }
         HomeMessage::SearchChanged(query) => {
@@ -154,6 +201,7 @@ pub fn update(
             // this prevents data races so we can avoid locks
             if state.pending_search == query {
                 state.search_results = results;
+                logos.enqueue_all(&state.prefetch_window());
             }
             Task::none()
         }
@@ -161,10 +209,17 @@ pub fn update(
             // Navigation to player will be handled at the app level.
             Task::none()
         }
-        HomeMessage::ShowAllToggled(show) => {
-            state.show_all_channels = show;
+        HomeMessage::LoadMore => {
+            let total = state.active_len().max(state.search_results.len());
+            if state.visible_limit < total {
+                state.visible_limit = (state.visible_limit + HomeState::PAGE_SIZE).min(total);
+            }
+            // Re-enqueueing the whole window is free: already-claimed channels
+            // are filtered out by ChannelItem::try_mark_logo_requested.
+            logos.enqueue_all(&state.prefetch_window());
             Task::none()
-        }
+        },
+
     }
 }
 
@@ -195,7 +250,9 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             .into()
     } else if !state.top_bar_search_query.trim().is_empty() {
         // ── Search results view ─────────────────────────────────────────
-        let results = state.search_results.clone();
+        let results = state.visible_search_results();
+        // let results = state.search_results.clone();
+        let total_results = state.search_results.len();
         let query = state.top_bar_search_query.clone();
 
         let heading = text(format!("Search results for \"{}\"", &query))
@@ -206,7 +263,7 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
                 ..Font::DEFAULT
             });
 
-        let result_count = text(format!("{} channels found", results.len()))
+        let result_count = text(format!("{} channels found", total_results))
             .size(theme::FONT_SIZE_MD)
             .color(theme::TEXT_SECONDARY);
 
@@ -218,14 +275,26 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             |id| HomeMessage::ChannelClicked(id),
         );
 
-        let body = column![
-            heading,
-            result_count,
-            grid,
-        ]
-        .spacing(theme::SPACING_MD)
-        .padding(theme::SPACING_XL)
-        .align_x(Center);
+        let mut body_children: Vec<Element<'_, HomeMessage>> = vec![
+            heading.into(),
+            result_count.into(),
+            grid.into()
+        ];
+        if state.visible_limit< total_results {
+            body_children.push(
+                button(text(format!(
+                    "Show More ({} of {})",
+                    state.visible_limit.min(total_results),
+                    total_results
+            )))
+             .on_press(HomeMessage::LoadMore)
+             .into(),
+            );
+        }
+        let body = column(body_children)
+            .spacing(theme::SPACING_MD)
+            .padding(theme::SPACING_XL)
+            .align_x(Center);
 
         scrollable(body)
             .width(Fill)
@@ -251,24 +320,12 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
             });
 
         // Determine the active channel set: the selected category, or all.
-        let visible: ChannelItems = if let Some(filtered) = state.filtered_channels.as_ref() {
-            filtered.clone()
-        } else {
-            state.channel_data.iter().cloned().collect()
-        };
-
-        // Single list: show up to PREVIEW_LIMIT cards, togglable to reveal all.
-        let preview_limit = 10;
-        let is_truncated = visible.len() > preview_limit;
-        let shown: ChannelItems = if state.show_all_channels || !is_truncated {
-            visible.clone()
-        } else {
-            visible.iter().take(preview_limit).cloned().collect()
-        };
+        let total = state.active_len();
+        let shown = state.visible_window();
 
         let grid = channel_grid::view(
             shown,
-            4,
+            5,
             theme::SPACING_MD,
             |id| HomeMessage::ChannelClicked(id),
         );
@@ -278,15 +335,14 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
         body_children.push(cat_tabs.into());
         body_children.push(page_title.into());
         body_children.push(grid.into());
-        if is_truncated {
-            let label = if state.show_all_channels {
-                "Show Less".into()
-            } else {
-                format!("Show All ({})", visible.len())
-            };
+        if state.has_more() {
             body_children.push(
-                button(text(label))
-                    .on_press(HomeMessage::ShowAllToggled(!state.show_all_channels))
+                button(text(format!(
+                    "Show More ({} of {})",
+                    state.visible_limit.min(total),
+                    total
+                )))
+                    .on_press(HomeMessage::LoadMore)
                     .into(),
             );
         }
