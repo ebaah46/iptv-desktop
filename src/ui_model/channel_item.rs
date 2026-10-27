@@ -1,5 +1,5 @@
 use std::sync::{Arc, OnceLock};
-
+use std::sync::atomic::{AtomicBool, Ordering};
 use libcore::domain::{Channel, Logo};
 
 /// A decoded channel logo ready to be rendered.
@@ -19,12 +19,14 @@ pub enum LogoImage {
 ///
 /// UI components interact only through the typed getters below and never touch
 /// the underlying domain `Channel`/`Logo` types directly.
-#[derive(Debug, Clone)]
+#[derive(Debug,)]
 pub struct ChannelItem {
     channel: Arc<Channel>,
     logo: Arc<Logo>,
     /// Decoded logo handle for the channel (None until fetched/decoded).
     logo_handle: Arc<OnceLock<LogoImage>>,
+    /// This flag sets whether a logo has been requested/downloaded already.
+    logo_requested: AtomicBool,
 }
 
 /// A collection of channel items used across the UI.
@@ -37,6 +39,7 @@ impl ChannelItem {
             channel,
             logo,
             logo_handle: Arc::new(OnceLock::new()),
+            logo_requested: AtomicBool::new(false),
         }
     }
 
@@ -115,4 +118,22 @@ impl ChannelItem {
         self.logo_handle.set(handle).is_ok()
     }
 
+    pub fn is_logo_loaded(&self) -> bool{
+        self.logo_handle.get().is_some()
+    }
+
+    /// Atomically claims the logo load for this channel. Returns `false` when
+    /// the logo is already loaded or another request already claimed it.
+    pub fn try_mark_logo_requested(&self) -> bool {
+        !self.is_logo_loaded()
+            && self
+            .logo_requested
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    /// Releases a claim so a load that failed can be retried on a later page.
+    pub fn release_logo_request(&self) {
+        self.logo_requested.store(false, Ordering::Release);
+    }
 }
