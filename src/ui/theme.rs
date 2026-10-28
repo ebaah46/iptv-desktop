@@ -62,3 +62,9 @@ pub const TOPBAR_HEIGHT: f32 = 52.0;
 pub const STATUSBAR_HEIGHT: f32 = 48.0;
 pub const CHANNEL_CARD_WIDTH: f32 = 180.0;
 pub const CHANNEL_CARD_HEIGHT: f32 = 210.0;
+
+/// Country card geometry: wider than tall, since a country row is text-only.
+pub const COUNTRY_CARD_WIDTH: f32 = 180.0;
+pub const COUNTRY_CARD_HEIGHT: f32 = 100.0;
+/// Rendered size of the flag glyph inside a country card.
+pub const COUNTRY_FLAG_GLYPH: f32 = 50.0;
