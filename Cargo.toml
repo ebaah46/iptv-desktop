@@ -1,6 +1,6 @@
 [package]
 name = "iptv_desktop"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2024"
 
 [dependencies]
@@ -13,7 +13,6 @@ libcore_cache = {package = "iptv-adapter-cache", git = "https://github.com/ebaah
 anyhow = "1.0.104"
 iced = { version = "0.14.0", features = ["tokio", "image", "svg"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync"] }
-reqwest = "0.13.5"
 iced_aw = { version = "0.14.1", features = ["full"], default-features = false }
 env_logger = "0.11.11"
 iced_video_player = "0.6.0"
