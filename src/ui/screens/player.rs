@@ -8,6 +8,7 @@ use libcore::domain::Stream;
 use libcore::facade::{CoreFacade, IptvFacade};
 use log::{info, warn};
 use tokio::sync::mpsc::UnboundedSender;
+use url::Url;
 use crate::player::commands::PlayerEvent;
 use crate::ui::components::icon::{ icon_button, SKIP_BACK, PAUSE, PLAY, SKIP_FORWARD, VOLUME_OFF, VOLUME_ON, FULLSCREEN_EXIT, FULLSCREEN_ENTER};
 use crate::ui::theme;
@@ -47,6 +48,7 @@ pub enum PlayerMessage {
     Paused,
     /// Sent after facade.stop() finishes.
     Stopped,
+    Exited,
 }
 
 /// State consumed by the player screen.
@@ -59,8 +61,6 @@ pub struct PlayerState {
     pub error_message: String,
     pub channel_name: String,
     pub channel_id: String,
-    /// Set by update() to signal app.rs to navigate back.
-    pub is_back_requested: bool,
     /// Most recently observed playback position (seconds).
     pub position_secs: u64,
     /// Duration of the current stream (seconds). 0 while unknown / live.
@@ -75,6 +75,9 @@ pub struct PlayerState {
     idle_ticks: u32,
     // This channel sends player events to libcore about player states.
     pub event_tx: Option<UnboundedSender<PlayerEvent>>,
+    /// Set by update() to signal app.rs to navigate back.
+    is_back_requested: bool,
+
 }
 
 impl Default for PlayerState {
@@ -149,6 +152,7 @@ pub fn update(
         }
         PlayerMessage::BackRequested => {
             info!("[player] BackRequested — stopping playback");
+            state.is_back_requested = true;
             Task::perform(
                 async move {
                     info!("[player] calling facade.stop()");
@@ -159,15 +163,23 @@ pub fn update(
         }
         PlayerMessage::Stopped => {
             info!("[player] Stopped — resetting state");
+            let leaving = std::mem::take(&mut state.is_back_requested);
+            // Keep the event channel: `Default` sets it to None, which would
+            // silence every PlayerEvent after the first exit.
+            let event_tx = state.event_tx.take();
             *state = PlayerState::default();
-            state.is_back_requested = true;
-            Task::none()
+            state.event_tx = event_tx;
+            if leaving {
+                Task::done(PlayerMessage::Exited)
+            } else {
+                Task::none()
+            }
         }
         PlayerMessage::ApplyLoad(stream) => {
-            let result = url::Url::parse(&stream.url)
+            let result = Url::parse(&stream.url)
                 .ok()
                 .and_then(|url| Video::new(&url).ok());
-
+            //TODO: Handle the error case where the Video object cannot be created
             state.loaded_video = result;
 
             let event = match state.loaded_video {
@@ -185,7 +197,7 @@ pub fn update(
             } else {
                 warn!("[player] Could not set playback state, loaded video not available");
             }
-            Task::none()
+            Task::done(PlayerMessage::Playing)
         },
         PlayerMessage::ApplyPause => {
             if let Some(video) = state.loaded_video.as_mut() {
@@ -280,6 +292,7 @@ pub fn update(
             Task::none()
         }
         PlayerMessage::Playing => Task::none(),
+        PlayerMessage::Exited => Task::none()
     }
 }
 
