@@ -9,7 +9,7 @@ use libcore::facade::IptvFacade;
 use crate::logo::LogoPipeline;
 use crate::ui::components::category_tabs;
 use crate::ui::components::channel_grid;
-use crate::ui::components::sidebar::{self, SidebarState};
+use crate::ui::components::sidebar::{self, SidebarEntry, SidebarState};
 use crate::ui::components::status_bar::{self, StatusBarData};
 use crate::ui::components::top_bar;
 use crate::ui::theme;
@@ -18,7 +18,7 @@ use crate::ui_model::ChannelItems;
 /// Messages handled by the home screen.
 #[derive(Debug, Clone)]
 pub enum HomeMessage {
-    CategorySelected(String),
+    CategorySelected(SidebarEntry),
     TabSelected(String),
     SearchChanged(String),
     SearchResultsReady(String, ChannelItems),
@@ -26,6 +26,7 @@ pub enum HomeMessage {
     ChannelClicked(String),
     /// Reveals the next page of the active list (category grid or search results).
     LoadMore,
+    CountriesClicked,
 }
 
 /// State consumed by the home screen.
@@ -220,6 +221,9 @@ pub fn update(
             Task::none()
         },
 
+        HomeMessage::CountriesClicked => {
+            Task::none()
+        }
     }
 }
 
@@ -229,7 +233,11 @@ pub fn view(state: &HomeState) -> Element<'_, HomeMessage> {
     let active_index = state.sidebar.active_index;
 
     let sidebar = sidebar::view(items, active_index, |index| {
-        HomeMessage::CategorySelected(index.to_string())
+        match index {
+            SidebarEntry::Countries => HomeMessage::CountriesClicked,
+            other => HomeMessage::CategorySelected(other)
+        }
+
     });
 
     let top_bar = top_bar::view(

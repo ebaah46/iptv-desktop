@@ -13,10 +13,12 @@ use crate::logo::{LogoLoader, merge_logo_batch, LogoPipeline};
 use crate::player::commands::{PlayerCommand, PlayerEvent};
 use crate::ui::message::Message;
 use crate::ui::page::Page;
-use crate::ui::screens::home::{self, HomeMessage, HomeState};
+use crate::ui::screens::countries;
+use crate::ui::screens::countries::CountryState;
+use crate::ui::screens::home::{self, HomeState};
 use crate::ui::screens::player::{self, PlayerState};
 use crate::ui::screens::player::PlayerMessage::{ApplyLoad, ApplyPause, ApplyPlay, ApplySeek, ApplyStop, Tick as PlayerTick};
-use crate::ui_model::{ChannelItem, ChannelItems, LogoImage};
+use crate::ui_model::{ChannelItem, ChannelItems, CountryItem, CountryItems, LogoImage};
 
 
 /// Root application state.
@@ -25,6 +27,7 @@ pub struct App {
     pub page: Page,
     pub home: HomeState,
     pub player: PlayerState,
+    pub country: CountryState,
     pub command_rx: Arc<Mutex<Option<UnboundedReceiver<PlayerCommand>>>>,
     pub logo_pipeline: Arc<LogoPipeline>
 }
@@ -39,6 +42,7 @@ impl App {
             page: Page::Home,
             home: HomeState::new(),
             player,
+            country: CountryState::default(),
             command_rx: Arc::new(Mutex::new(Some(command_tx))),
             logo_pipeline: logos
         }
@@ -94,28 +98,30 @@ impl App {
 /// Processes a message and mutates state.
 pub fn update(state: &mut App, message: Message) -> Task<Message> {
     match message {
-        Message::NavigateTo(page) => {
-            state.page = page;
-            Task::none()
+        Message::NavigateTo(route) => {
+            state.page = route.page;
+            helpers::enter(state, &route)
         }
         Message::Home(msg) => {
-            // Intercept ChannelClicked to navigate to Player screen.
-            if let HomeMessage::ChannelClicked(id) = &msg {
-                state.player.channel_id = id.clone();
-                state.player.channel_name = id.clone();
-                state.player.error_message.clear();
-                state.page = Page::Player;
+            // Extract the route *before* delegating (msg is consumed by home::update).
+            let route = helpers::route_from_home(&msg);
+            let task = home::update(&mut state.home, msg, state.facade.clone(), state.logo_pipeline.as_ref())
+                .map(Message::Home);
+            match route {
+                Some(route) => Task::batch([task, Task::done(Message::NavigateTo(route))]),
+                None => task,
             }
-            home::update(&mut state.home, msg, state.facade.clone(), state.logo_pipeline.as_ref())
-                .map(Message::Home)
         }
+
         Message::Player(msg) => {
-            let result = player::update(&mut state.player, msg, state.facade.clone());
-            if state.player.is_back_requested {
-                state.player.is_back_requested = false;
-                state.page = Page::Home;
+            // Same shape as Home/Country: no `state.page = ...` anywhere but NavigateTo.
+            let route = helpers::route_from_player(&msg);
+            let task = player::update(&mut state.player, msg, state.facade.clone())
+                .map(Message::Player);
+            match route {
+                Some(route) => Task::batch([task, Task::done(Message::NavigateTo(route))]),
+                None => task,
             }
-            result.map(Message::Player)
         },
         Message::PrepareHome => {
             let facade = state.facade.clone();
@@ -147,8 +153,11 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
 
             state.home.channel_data = Arc::new(items);
             state.home.category_data =  state.facade.catalog_service.get_categories();
-            state.home.countries_data = state.facade.catalog_service.get_countries();
-            info!("[player] # Channels: {}", state.home.channel_count);
+            state.country.countries = state.facade.catalog_service.get_countries()
+                .iter()
+                .map(|country| Arc::new(CountryItem::new(country.clone())))
+                .collect();
+            info!("[player] # Channels: {} Countries:{}", state.home.channel_count, state.country.countries.len());
             state.home.loading = false;
 
             state.logo_pipeline.enqueue_all(&state.home.prefetch_window());
@@ -176,6 +185,14 @@ pub fn update(state: &mut App, message: Message) -> Task<Message> {
         }
 
         Message::Unknown => Task::none(),
+        Message::Country(msg) => {
+            let route = helpers::route_from_country(&msg);
+            let task = countries::update(&mut state.country, msg, state.facade.clone()).map(Message::Country);
+            match route {
+                Some(route) => Task::batch([task, Task::done(Message::NavigateTo(route))]),
+                None => task,
+            }
+        }
     }
 }
 
@@ -188,6 +205,7 @@ pub fn view(state: &App) -> Element<'_, Message> {
             player::view(&state.player, video)
                 .map(Message::Player)
         },
+        Page::Country => countries::view(&state.country).map(Message::Country)
     }
 }
 
@@ -195,6 +213,63 @@ pub fn view(state: &App) -> Element<'_, Message> {
 pub fn theme(_state: &App) -> Theme {
     Theme::Dark
 }
+
+mod helpers {
+    use iced::Task;
+    use crate::ui::app::App;
+    use crate::ui::message::Message;
+    use crate::ui::page::{Page, Route};
+    use crate::ui::screens::countries;
+    use crate::ui::screens::home::HomeMessage;
+    use crate::ui::screens::countries::CountryMessage;
+    use crate::ui::screens::player::PlayerMessage;
+
+    /// Does this home message leave the screen? If so, with what context?
+    pub fn route_from_home(msg: &HomeMessage) -> Option<Route> {
+        match msg {
+            HomeMessage::CountriesClicked => Some(Route::to(Page::Country)),
+            HomeMessage::ChannelClicked(id) => Some(Route::focused(Page::Player, id.clone())),
+            _ => None,
+        }
+    }
+    pub fn route_from_country(msg: &CountryMessage) -> Option<Route> {
+        match msg {
+            CountryMessage::BackRequested => Some(Route::to(Page::Home)),
+            _ => None,
+        }
+    }
+    pub fn route_from_player(msg: &PlayerMessage) -> Option<Route> {
+        match msg {
+            PlayerMessage::Exited => Some(Route::to(Page::Home)),
+            _ => None,
+        }
+    }
+
+    /// Enter-time work for a route, in one place. Any future page that needs a
+    /// preselection or a load task hooks in here — never in a delegate arm.
+    pub fn enter(state: &mut App, route: &Route) -> Task<Message> {
+        match route.page {
+            Page::Home => Task::none(),
+            Page::Player => {
+                if let Some(id) = &route.focus {
+                    state.player.channel_id = id.clone();
+                    state.player.channel_name = id.clone();
+                    state.player.error_message.clear();
+                }
+                Task::none()
+            }
+            Page::Country => {
+                if let Some(code) = &route.focus {
+                    state.country.selected_country = code.clone();
+                }
+                countries::update(&mut state.country, CountryMessage::Entered, state.facade.clone())
+                    .map(Message::Country)
+            }
+        }
+    }
+
+}
+
 
 #[derive(Clone)]
 struct PlayerCommandsId {

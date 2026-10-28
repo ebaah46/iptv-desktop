@@ -1,5 +1,6 @@
 use crate::player::commands::PlayerCommand;
-use crate::ui::page::Page;
+use crate::ui::page::{Route};
+use crate::ui::screens::countries::CountryMessage;
 use crate::ui::screens::home::HomeMessage;
 use crate::ui::screens::player::PlayerMessage;
 use crate::ui_model::LogoImage;
@@ -8,7 +9,7 @@ use crate::ui_model::LogoImage;
 #[derive(Debug, Clone, Default)]
 pub enum Message {
     /// Navigate to the given page.
-    NavigateTo(Page),
+    NavigateTo(Route),
     #[default]
     /// Prepare data for homescreen
     PrepareHome,
@@ -22,6 +23,8 @@ pub enum Message {
     Home(HomeMessage),
     /// Delegate to the player screen.
     Player(PlayerMessage),
+    /// Delegate to Country screen
+    Country(CountryMessage),
 
     PlayerCommand(PlayerCommand),
 
