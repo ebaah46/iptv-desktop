@@ -7,24 +7,46 @@ use crate::ui::theme;
 #[derive(Debug, Clone)]
 pub struct SidebarState {
     /// All category items.
-    pub items: Vec<String>,
+    pub items: Vec<SidebarEntry>,
     /// Index of the currently selected item.
     pub active_index: usize,
+}
+
+
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum SidebarEntry {
+    Favorites,
+    Recent,
+    #[default]
+    All,
+    Countries,
+    Kids,
+    Settings
+}
+
+impl SidebarEntry {
+    pub fn as_str(&self) -> &'static str{
+        match self {
+            SidebarEntry::Favorites => "Favorites",
+            SidebarEntry::Recent => "Recent",
+            SidebarEntry::All => "All",
+            SidebarEntry::Countries => "Countries",
+            SidebarEntry::Kids => "Kids",
+            SidebarEntry::Settings => "Settings"
+        }
+    }
 }
 
 impl Default for SidebarState {
     fn default() -> Self {
         Self {
             items: vec![
-                "Favorites".into(),
-                "Recent".into(),
-                "All".into(),
-                "Sports".into(),
-                "News".into(),
-                "Movies".into(),
-                "Documentaries".into(),
-                "Music".into(),
-                "Kids".into(),
+                SidebarEntry::Favorites,
+                SidebarEntry::Recent,
+                SidebarEntry::All,
+                SidebarEntry::Countries,
+                SidebarEntry::Kids,
+                SidebarEntry::Settings,
             ],
             active_index: 2,
         }
@@ -33,9 +55,9 @@ impl Default for SidebarState {
 
 /// Renders the sidebar.
 pub fn view<Message: 'static + Clone>(
-    items: Vec<String>,
+    items: Vec<SidebarEntry>,
     active_index: usize,
-    on_selected: impl Fn(usize) -> Message + 'static + Clone,
+    on_selected: impl Fn(SidebarEntry) -> Message + 'static + Clone,
 ) -> Element<'static, Message> {
     let title = text("Categories")
         .size(21.0)
@@ -49,7 +71,7 @@ pub fn view<Message: 'static + Clone>(
         .map(|(i, item)| {
             let is_active = i == active_index;
 
-            let label = text(item)
+            let label = text(item.as_str())
                 .size(theme::FONT_SIZE_MD)
                 .color(if is_active {
                     theme::TEXT_PRIMARY
@@ -66,7 +88,7 @@ pub fn view<Message: 'static + Clone>(
                 });
 
             let btn = button(label)
-                .on_press(on_selected(i))
+                .on_press(on_selected(item))
                 .width(Fill)
                 .style(move |_theme: &iced::Theme, status| {
                     use iced::widget::button::{Status, Style};
