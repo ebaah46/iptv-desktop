@@ -4,7 +4,7 @@ use libcore::domain::Country;
 
 /// A country item as used across the UI
 ///
-#[derive(Debug,)]
+#[derive(Debug)]
 pub struct CountryItem {
     country: Arc<Country>
 }
