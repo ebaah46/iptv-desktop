@@ -12,6 +12,9 @@ pub enum CountryMessage {
     CountrySelected(String),
     BackRequested,
     Entered,
+    ChannelClicked(String),
+    /// Reveals the next page of the selected country's channels.
+    LoadMore,
 }
 
 
@@ -29,6 +32,8 @@ pub fn update(state: &mut CountryState, message: CountryMessage, facade: Arc<Ipt
         CountryMessage::Entered => {
             Task::none()
         }
+        CountryMessage::ChannelClicked(_) => {}
+        CountryMessage::LoadMore => {}
     }
 }
 

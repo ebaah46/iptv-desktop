@@ -67,4 +67,10 @@ pub const CHANNEL_CARD_HEIGHT: f32 = 210.0;
 pub const COUNTRY_CARD_WIDTH: f32 = 180.0;
 pub const COUNTRY_CARD_HEIGHT: f32 = 100.0;
 /// Rendered size of the flag glyph inside a country card.
+
+/// Compact chip used by the horizontal country strip on the Countries screen.
+/// Deliberately short: the strip is a fixed-height band above the channel grid,
+/// so every pixel here is a pixel the grid does not get.
+pub const COUNTRY_CHIP_WIDTH: f32 = 168.0;
+pub const COUNTRY_CHIP_HEIGHT: f32 = 44.0;
 pub const COUNTRY_FLAG_GLYPH: f32 = 50.0;

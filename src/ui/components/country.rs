@@ -162,3 +162,98 @@ pub mod grid {
     }
 }
 
+
+pub mod strip {
+    use std::sync::Arc;
+
+    use iced::widget::scrollable::{Direction, Scrollbar};
+    use iced::widget::{button, column, container, row, scrollable, text};
+    use iced::{Center, Element, Fill, Length};
+
+    use crate::ui::theme;
+    use crate::ui_model::{CountryItem, CountryItems};
+
+    /// Renders the country list as a single horizontally scrolling row of chips.
+    ///
+    /// Its own module rather than a flag on `grid::view` because the geometry is
+    /// different in kind: chips are one line tall, never wrap, and the element is
+    /// height-`Shrink` so it does not steal space from the channel grid below.
+    pub fn view<Message: 'static + Clone>(
+        countries: CountryItems,
+        spacing: f32,
+        selected: Option<String>,
+        on_click: impl Fn(String) -> Message + 'static + Clone,
+    ) -> Element<'static, Message> {
+        let chips: Vec<Element<'static, Message>> = countries
+            .iter()
+            .map(|item| {
+                let code = item.code().to_string();
+                let is_selected = selected.as_deref() == Some(code.as_str());
+                let cb = on_click.clone();
+                chip(item.clone(), is_selected, move |c| cb(c))
+            })
+            .collect();
+
+        scrollable(row(chips).spacing(spacing))
+            .direction(Direction::Horizontal(Scrollbar::new()))
+            .width(Fill)
+            .height(Length::Shrink)
+            .into()
+    }
+
+    /// A compact, single-line country chip: flag + name + code.
+    pub fn chip<Message: 'static + Clone>(
+        item: Arc<CountryItem>,
+        selected: bool,
+        on_selected: impl Fn(String) -> Message + 'static + Clone,
+    ) -> Element<'static, Message> {
+        let code = item.code().to_string();
+
+        let label = row![
+            text(item.flag().to_string())
+                .size(theme::FONT_SIZE_LG)
+                .color(theme::TEXT_PRIMARY),
+            column![
+                text(item.name().to_string())
+                    .size(theme::FONT_SIZE_MD)
+                    .color(theme::TEXT_PRIMARY),
+                text(code.clone())
+                    .size(theme::FONT_SIZE_SM)
+                    .color(theme::TEXT_SECONDARY),
+            ]
+            .spacing(0.0)
+            .width(Fill),
+        ]
+            .spacing(theme::SPACING_SM)
+            .align_y(Center);
+
+        button(
+            container(label)
+                .width(theme::COUNTRY_CHIP_WIDTH)
+                .height(theme::COUNTRY_CHIP_HEIGHT)
+                .padding([theme::SPACING_XS, theme::SPACING_SM])
+                .align_y(Center),
+        )
+            .on_press(on_selected(code))
+            .padding(0)
+            .style(move |_theme: &iced::Theme, status| {
+                use iced::widget::button::{Status, Style};
+                let background = match status {
+                    Status::Hovered => Some(iced::Background::Color(theme::SURFACE_HOVER)),
+                    Status::Pressed => Some(iced::Background::Color(theme::ACCENT)),
+                    _ if selected => Some(iced::Background::Color(theme::SURFACE)),
+                    _ => Some(iced::Background::Color(theme::CARD_BG)),
+                };
+                Style {
+                    background,
+                    border: iced::Border {
+                        width: if selected { 2.0 } else { 1.0 },
+                        color: if selected { theme::ACCENT } else { theme::BORDER_COLOR },
+                        radius: theme::RADIUS_MD.into(),
+                    },
+                    ..Style::default()
+                }
+            })
+            .into()
+    }
+}
