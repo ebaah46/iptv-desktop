@@ -1,0 +1,5 @@
+CountriesScreen CountriesScreen.qml
+CountryChannelsScreen CountryChannelsScreen.qml
+HomeScreen HomeScreen.qml
+LoadingScreen LoadingScreen.qml
+PlayerScreen PlayerScreen.qml
