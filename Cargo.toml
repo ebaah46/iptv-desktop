@@ -1,6 +1,6 @@
 [package]
 name = "iptv_desktop"
-version = "0.3.4"
+version = "0.4.0"
 edition = "2024"
 
 [dependencies]
@@ -11,17 +11,10 @@ libcore = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_api = {package = "iptv-adapter-api", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_cache = {package = "iptv-adapter-cache", git = "https://github.com/ebaah46/iptv-core.git"}
 anyhow = "1.0.104"
-iced = { version = "0.14.0", features = ["tokio", "image", "svg"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync"] }
-reqwest = "0.13.5"
-iced_aw = { version = "0.14.1", features = ["full"], default-features = false }
 env_logger = "0.11.11"
-iced_video_player = "0.6.0"
-url = "2.5.8"
 log = "0.4.34"
-futures = "0.3.34"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico"] }
-
+qtbridge = {version = "0.4", features=["linkme"]}
 
 
 [profile.release]

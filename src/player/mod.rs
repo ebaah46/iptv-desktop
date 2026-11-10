@@ -1,4 +1,5 @@
-pub mod gst_player_controller;
-pub mod commands;
+mod adapter;
+mod player;
 
-pub use gst_player_controller::GstPlayerController;
+pub use adapter::PlayerAdapter;
+pub use player::QmlPlayer;
