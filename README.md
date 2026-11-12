@@ -77,3 +77,7 @@ IPTV_CONFIG_PATH=/path/to/config.json cargo run
 
 The cache database (`cache.redb`) is written to the platform data directory
 derived from the `app` identity in the configuration.
+
+On startup the catalog is loaded from the cache while it is younger than
+`cache.ttl_days`. Once it expires, the catalog is fetched from the API and the
+cache is rewritten. Set `ttl_days` to `0` to always fetch from the network.

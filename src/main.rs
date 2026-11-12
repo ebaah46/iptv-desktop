@@ -13,6 +13,7 @@ use libcore::services::{
 };
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
+use log::info;
 use qtbridge::{QApp, QmlObject};
 use std::sync::Arc;
 
@@ -45,7 +46,7 @@ fn main() -> Res<()> {
     config.ensure_data_path();
     let cache_path = config.cache_db_path().expect("Cache path non-existent.");
 
-    println!("Cache path: {:?}", cache_path);
+    info!("Cache path: {:?}", cache_path);
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
     let store = Arc::new(FileStore::new(cache_path, config.cache.ttl_days));
     let cache = Arc::new(IptvCacheStore::new(store));

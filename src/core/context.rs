@@ -2,13 +2,13 @@ use std::sync::{Arc, OnceLock};
 
 use libcore::{
     facade::{CoreFacade, IptvFacade},
-    services::{CatalogService, PlaybackController},
+    services::{CatalogService, LoadOutcome, PlaybackController},
 };
 use tokio::runtime::{Handle, Runtime};
 
 /// Application-wide services, initialised once before QML loads.
-/// Also provides access to tokio runtime and the application wide 
-/// access to the core library entrypoint. Note that the application 
+/// Also provides access to tokio runtime and the application wide
+/// access to the core library entrypoint. Note that the application
 /// context is a singleton
 pub struct AppContext {
     facade: Arc<IptvFacade>,
@@ -52,8 +52,18 @@ impl AppContext {
         self.runtime.handle().clone()
     }
 
-    pub fn refresh(&self) {
-        self.facade.refresh();
+    /// Load the catalog, preferring a fresh cache and falling back to the
+    /// network when the cache is missing or stale.
+    pub fn load(&self) -> anyhow::Result<LoadOutcome> {
+        self.facade.load_catalog()
+    }
+
+    /// Force a catalog refresh from the network.
+    ///
+    /// Kept for a future manual refresh action; startup uses [`Self::load`].
+    #[allow(dead_code)]
+    pub fn refresh(&self) -> anyhow::Result<()> {
+        self.facade.refresh()
     }
 }
 

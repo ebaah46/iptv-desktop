@@ -33,14 +33,18 @@ impl AppState {
     fn load(&mut self) {
         let handle = self.get_thread_handle();
         context::get().spawn_blocking(move || {
-            let result = std::panic::catch_unwind(|| context::get().refresh());
+            // `load` reports failures through `Result`; the panic guard is a
+            // safety net so a core panic cannot leave the UI on the loading screen.
+            let result = std::panic::catch_unwind(|| context::get().load())
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("catalog load panicked")));
             handle.invoke_mut(move |state| match result {
-                Ok(()) => {
+                Ok(outcome) => {
+                    log::info!("Catalog loaded from {:?}", outcome.source);
                     state.ready = true;
                     state.ready_changed();
                 }
-                Err(_) => {
-                    state.error = "Failed to load catalog".into();
+                Err(e) => {
+                    state.error = format!("Failed to load catalog: {e}");
                     state.error_changed();
                 }
             });
