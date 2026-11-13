@@ -12,6 +12,8 @@ Rectangle {
     property var items: ["Favorites", "Recent", "All", "Countries", "Kids", "Settings"]
     /// Index of the currently selected item.
     property int activeIndex: 2
+    /// Number of favorite channels, shown as a badge on the Favorites row.
+    property int favoriteCount: 0
 
     signal selected(int index)
 
@@ -69,6 +71,25 @@ Rectangle {
                             color: row.active ? Theme.textPrimary : Theme.textSecondary
                             font.pixelSize: Theme.fontSizeMd
                             font.weight: row.active ? Font.DemiBold : Font.Normal
+                        }
+
+                        Rectangle {
+                            visible: row.index === 0 && root.favoriteCount > 0
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: favoriteCountLabel.implicitWidth + 8
+                            height: 18
+                            radius: 9
+                            color: Theme.accent
+
+                            Text {
+                                id: favoriteCountLabel
+                                anchors.centerIn: parent
+                                text: root.favoriteCount
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontSizeSm
+                            }
                         }
 
                         MouseArea {

@@ -1,8 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Layouts
 import "../theme"
-
 
 Rectangle {
     id: root
@@ -10,8 +10,10 @@ Rectangle {
     property string channelId: ""
     property string channelName: ""
     property string logoSource: ""
+    property bool favorite: false
 
     signal clicked(string channelId, string channelName)
+    signal favoriteToggled(string channelId)
 
     readonly property real logoSize: Theme.channelCardHeight * 0.6
     readonly property real progress: 0.8
@@ -28,6 +30,16 @@ Rectangle {
     border.width: 1.5
     border.color: Theme.borderColor
     clip: true
+
+    // Declared before the content so the heart button inside the name row can
+    // sit above it and take over its own clicks.
+    MouseArea {
+        id: mouse
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.clicked(root.channelId, root.channelName)
+    }
 
     Column {
         anchors.fill: parent
@@ -73,13 +85,39 @@ Rectangle {
             }
         }
 
-        Text {
+        RowLayout {
             width: parent.width
-            text: root.channelName
-            color: Theme.textPrimary
-            font.pixelSize: Theme.fontSizeLg
-            font.weight: Font.DemiBold
-            elide: Text.ElideRight
+            spacing: Theme.spacingSm
+
+            Text {
+                Layout.fillWidth: true
+                text: root.channelName
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontSizeLg
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+
+            Item {
+                id: favoriteButton
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
+                Layout.alignment: Qt.AlignVCenter
+
+                Icon {
+                    anchors.centerIn: parent
+                    width: 20
+                    height: 20
+                    path: root.favorite ? Icons.heart : Icons.heartOutline
+                    color: root.favorite ? Theme.accent : Theme.textSecondary
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.favoriteToggled(root.channelId)
+                }
+            }
         }
 
         Text {
@@ -103,13 +141,5 @@ Rectangle {
                 color: Theme.progressFill
             }
         }
-    }
-
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.clicked(root.channelId, root.channelName)
     }
 }

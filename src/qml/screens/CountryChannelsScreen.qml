@@ -28,7 +28,7 @@ Item {
 
     function applyFilters() {
         if (channels && typeof channels.applyFilters === "function")
-            channels.applyFilters("", "", countryCode, "");
+            channels.applyFilters("", "", countryCode, "", false);
     }
 
     function loadMore() {
@@ -126,6 +126,10 @@ Item {
                             columns: Math.max(1, Math.floor((gridWrap.width + spacing) / (Theme.channelCardWidth + spacing)))
                             channels: root.channels
                             onChannelClicked: (channelId, channelName) => root.channelClicked(channelId, channelName)
+                            onFavoriteToggled: channelId => {
+                                if (root.channels && typeof root.channels.toggleFavorite === "function")
+                                    root.channels.toggleFavorite(channelId);
+                            }
                         }
                     }
 

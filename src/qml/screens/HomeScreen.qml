@@ -17,6 +17,7 @@ Item {
     property string activeCategoryId: ""
     property string activeCategoryName: "All"
     property string searchQuery: ""
+    property bool favoritesOnly: false
 
     // ── Chrome state ─────────────────────────────────────────────────
     property string activeTab: "Home"
@@ -26,6 +27,7 @@ Item {
 
     readonly property int visibleCount: channels && channels.loadedCount !== undefined ? channels.loadedCount : 0
     readonly property int totalCount: channels && channels.channelCount !== undefined ? channels.channelCount : 0
+    readonly property int favoriteCount: channels && channels.favoriteCount !== undefined ? channels.favoriteCount : 0
     readonly property bool hasMore: channels && channels.hasMore !== undefined ? channels.hasMore : false
 
     // ── Status bar ───────────────────────────────────────────────────
@@ -48,8 +50,10 @@ Item {
 
     function applyFilters() {
         if (channels && typeof channels.applyFilters === "function")
-            channels.applyFilters(searchQuery, activeCategoryId, "", "");
+            channels.applyFilters(searchQuery, activeCategoryId, "", "", favoritesOnly);
     }
+
+    onFavoritesOnlyChanged: applyFilters()
 
     function loadMore() {
         if (channels && typeof channels.loadMore === "function")
@@ -94,11 +98,14 @@ Item {
                 Sidebar {
                     Layout.fillHeight: true
                     activeIndex: root.activeSidebarIndex
+                    favoriteCount: root.channels && root.channels.favoriteCount !== undefined ? root.channels.favoriteCount : 0
                     onSelected: index => {
                         // SidebarEntry::Countries (3) navigates away; the Iced
                         // app leaves the highlight on the previous entry.
                         if (index !== 3)
                             root.activeSidebarIndex = index;
+                        // SidebarEntry::Favorites is index 0.
+                        root.favoritesOnly = index === 0;
                         root.sidebarSelected(index);
                     }
                 }
@@ -147,11 +154,20 @@ Item {
                             Text {
                                 width: parent.width - parent.leftPadding - parent.rightPadding
                                 visible: !root.searching
-                                text: root.activeCategoryName
+                                text: root.favoritesOnly && root.activeCategoryId === "" ? qsTr("Favorites") : root.activeCategoryName
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontSizeXl
                                 font.weight: Font.Bold
                                 elide: Text.ElideRight
+                            }
+
+                            Text {
+                                width: parent.width - parent.leftPadding - parent.rightPadding
+                                visible: root.favoritesOnly && !root.searching && root.favoriteCount === 0
+                                text: qsTr("No favorites yet. Tap the heart on a channel to add it here.")
+                                color: Theme.textSecondary
+                                font.pixelSize: Theme.fontSizeMd
+                                wrapMode: Text.WordWrap
                             }
 
                             // ── Search heading ──────────────────────────
@@ -186,6 +202,10 @@ Item {
                                     columns: Math.max(1, Math.floor((gridWrap.width + spacing) / (Theme.channelCardWidth + spacing)))
                                     channels: root.channels
                                     onChannelClicked: (channelId, channelName) => root.channelClicked(channelId, channelName)
+                                    onFavoriteToggled: channelId => {
+                                        if (root.channels && typeof root.channels.toggleFavorite === "function")
+                                            root.channels.toggleFavorite(channelId);
+                                    }
                                 }
                             }
 

@@ -33,11 +33,13 @@ ApplicationWindow {
 
     ChannelList {
         id: channelList
+        onFavoritesChanged: countryChannelList.refreshFavorites()
     }
 
     // Separate model so the country page does not clobber the home filters.
     ChannelList {
         id: countryChannelList
+        onFavoritesChanged: channelList.refreshFavorites()
     }
 
     StackLayout {
