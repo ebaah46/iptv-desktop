@@ -1,6 +1,6 @@
 [package]
 name = "iptv_desktop"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 
 [dependencies]
@@ -10,6 +10,7 @@ serde_json = "1"
 libcore = {package = "core", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_api = {package = "iptv-adapter-api", git = "https://github.com/ebaah46/iptv-core.git"}
 libcore_cache = {package = "iptv-adapter-cache", git = "https://github.com/ebaah46/iptv-core.git"}
+libcore_persistence = {package = "iptv-adapter-persistence", git = "https://github.com/ebaah46/iptv-core.git"}
 anyhow = "1.0.104"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync"] }
 env_logger = "0.11.11"

@@ -342,8 +342,8 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.4.0"
-source = "git+https://github.com/ebaah46/iptv-core.git#07783232c20ac8d76d0eaafdce27b177786af95f"
+version = "0.5.0"
+source = "git+https://github.com/ebaah46/iptv-core.git#53e54124ac2d86881c2bbc86d0826b4eadd1ae50"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1094,7 +1094,7 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 [[package]]
 name = "iptv-adapter-api"
 version = "0.2.3"
-source = "git+https://github.com/ebaah46/iptv-core.git#07783232c20ac8d76d0eaafdce27b177786af95f"
+source = "git+https://github.com/ebaah46/iptv-core.git#53e54124ac2d86881c2bbc86d0826b4eadd1ae50"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1108,7 +1108,20 @@ dependencies = [
 [[package]]
 name = "iptv-adapter-cache"
 version = "0.1.0"
-source = "git+https://github.com/ebaah46/iptv-core.git#07783232c20ac8d76d0eaafdce27b177786af95f"
+source = "git+https://github.com/ebaah46/iptv-core.git#53e54124ac2d86881c2bbc86d0826b4eadd1ae50"
+dependencies = [
+ "anyhow",
+ "core",
+ "log",
+ "postcard",
+ "redb",
+ "serde",
+]
+
+[[package]]
+name = "iptv-adapter-persistence"
+version = "0.2.0"
+source = "git+https://github.com/ebaah46/iptv-core.git#53e54124ac2d86881c2bbc86d0826b4eadd1ae50"
 dependencies = [
  "anyhow",
  "core",
@@ -1120,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "iptv_desktop"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "core",
@@ -1128,6 +1141,7 @@ dependencies = [
  "env_logger",
  "iptv-adapter-api",
  "iptv-adapter-cache",
+ "iptv-adapter-persistence",
  "log",
  "qtbridge",
  "serde",
