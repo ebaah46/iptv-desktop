@@ -37,8 +37,9 @@ Declared in `Cargo.toml`:
 | `libcore` (`core`) | Domain model and services from [iptv-core](https://github.com/ebaah46/iptv-core) |
 | `libcore_api` (`iptv-adapter-api`) | REST client adapter |
 | `libcore_cache` (`iptv-adapter-cache`) | Caching adapter |
+| `libcore_persistence` (`iptv-adapter-persistence`) | Favorites persistence adapter |
 
-The three `libcore*` crates are pulled directly from GitHub, so an internet
+The four `libcore*` crates are pulled directly from GitHub, so an internet
 connection is needed on the first build.
 
 ## Building
@@ -75,9 +76,18 @@ configuration file, set `IPTV_CONFIG_PATH`:
 IPTV_CONFIG_PATH=/path/to/config.json cargo run
 ```
 
-The cache database (`cache.redb`) is written to the platform data directory
-derived from the `app` identity in the configuration.
+The cache database (`cache.redb`) and the favorites database (`favorites.redb`)
+are written to the platform data directory derived from the `app` identity in
+the configuration.
 
 On startup the catalog is loaded from the cache while it is younger than
 `cache.ttl_days`. Once it expires, the catalog is fetched from the API and the
 cache is rewritten. Set `ttl_days` to `0` to always fetch from the network.
+
+### Favorites
+
+Channels can be marked as favorites from any channel grid. Favorites are stored
+as channel ids in `favorites.redb` in the data directory, so they survive
+catalog refreshes and are resolved against the current catalog on each load.
+The sidebar's **Favorites** entry filters the home grid to favorite channels
+while keeping search and category filters available.

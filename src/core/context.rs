@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use libcore::{
     facade::{CoreFacade, IptvFacade},
-    services::{CatalogService, LoadOutcome, PlaybackController},
+    services::{CatalogService, FavoritesService, LoadOutcome, PlaybackController},
 };
 use tokio::runtime::{Handle, Runtime};
 
@@ -22,11 +22,16 @@ impl AppContext {
 
     // ── Core services ────────────────────────────────────────────
     pub fn catalog(&self) -> Arc<dyn CatalogService> {
-        self.facade.catalog_service.clone()
+        self.facade.get_catalog_service()
+    }
+
+    /// Favorites service handle.
+    pub fn favorites(&self) -> Arc<dyn FavoritesService> {
+        self.facade.get_favorites_service()
     }
 
     pub fn playback(&self) -> Arc<dyn PlaybackController> {
-        self.facade.playback_controller.clone()
+        self.facade.get_playback_controller()
     }
 
     // ── Async helpers ────────────────────────────────────────────
@@ -55,7 +60,7 @@ impl AppContext {
     /// Load the catalog, preferring a fresh cache and falling back to the
     /// network when the cache is missing or stale.
     pub fn load(&self) -> anyhow::Result<LoadOutcome> {
-        self.facade.load_catalog()
+        self.facade.get_catalog_service().load()
     }
 
     /// Force a catalog refresh from the network.
@@ -63,7 +68,7 @@ impl AppContext {
     /// Kept for a future manual refresh action; startup uses [`Self::load`].
     #[allow(dead_code)]
     pub fn refresh(&self) -> anyhow::Result<()> {
-        self.facade.refresh()
+        self.facade.get_catalog_service().refresh()
     }
 }
 

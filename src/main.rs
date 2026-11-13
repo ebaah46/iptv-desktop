@@ -8,11 +8,12 @@ use config::AppConfig;
 
 use libcore::facade::IptvFacade;
 use libcore::services::{
-    IpTvPlaybackController, IptvStreamResolver, catalog_repository::IptvCatalogRepository,
-    catalog_service::IptvCatalogService,
+    IpTvPlaybackController, IptvFavoritesService, IptvStreamResolver,
+    catalog_repository::IptvCatalogRepository, catalog_service::IptvCatalogService,
 };
 use libcore_api::IptvRestClient;
 use libcore_cache::{FileStore, IptvCacheStore};
+use libcore_persistence::RedbFavoritesStore;
 use log::info;
 use qtbridge::{QApp, QmlObject};
 use std::sync::Arc;
@@ -45,13 +46,22 @@ fn main() -> Res<()> {
     let config = AppConfig::load()?;
     config.ensure_data_path();
     let cache_path = config.cache_db_path().expect("Cache path non-existent.");
+    let favorites_path = config
+        .favorites_db_path()
+        .expect("Favorites path non-existent.");
 
     info!("Cache path: {:?}", cache_path);
+    info!("Favorites path: {:?}", favorites_path);
     let client = Arc::new(IptvRestClient::new(config.api.base_url.clone()));
     let store = Arc::new(FileStore::new(cache_path, config.cache.ttl_days));
     let cache = Arc::new(IptvCacheStore::new(store));
     let repository = Arc::new(IptvCatalogRepository::new(client, cache));
     let catalog_service = Arc::new(IptvCatalogService::new(repository.clone()));
+    let favorites_store = Arc::new(RedbFavoritesStore::new(favorites_path)?);
+    let favorites_service = Arc::new(IptvFavoritesService::new(
+        favorites_store,
+        repository.clone(),
+    ));
     let stream_resolver = Arc::new(IptvStreamResolver::new(repository));
 
     // ── 4. Runtime + facade ─────────────────────────────────────────
@@ -61,7 +71,11 @@ fn main() -> Res<()> {
         let playback = Arc::new(IpTvPlaybackController::new(stream_resolver, player_adapter));
         // Wire the listener on the Qt thread, before the event loop starts.
         qml_player.borrow_mut().set_listener(playback.clone());
-        Arc::new(IptvFacade::new(catalog_service, playback))
+        Arc::new(IptvFacade::new(
+            catalog_service,
+            favorites_service,
+            playback,
+        ))
     });
 
     // ── 5. Publish the global context (must precede QML load) ───────

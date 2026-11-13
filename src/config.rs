@@ -1,5 +1,11 @@
 use serde::Deserialize;
 
+/// File name used for the favorites database inside the data directory.
+///
+/// Favorites are user data, so they live in their own database rather than
+/// sharing the disposable catalog cache file.
+const FAVORITES_DB_FILE: &str = "favorites.redb";
+
 /// Top-level application configuration.
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
@@ -38,17 +44,16 @@ impl AppConfig {
     pub fn load() -> Result<Self, ConfigError> {
         // Check for environment variable override first.
         if let Ok(path) = std::env::var("IPTV_CONFIG_PATH") {
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| ConfigError::Io(e.to_string()))?;
-            let config: AppConfig = serde_json::from_str(&content)
-                .map_err(|e| ConfigError::Parse(e))?;
+            let content =
+                std::fs::read_to_string(&path).map_err(|e| ConfigError::Io(e.to_string()))?;
+            let config: AppConfig =
+                serde_json::from_str(&content).map_err(|e| ConfigError::Parse(e))?;
             return Ok(config);
         }
 
         // Fall back to the embedded default config.
         let content = include_str!("../config.default.json");
-        let config: AppConfig = serde_json::from_str(content)
-            .map_err(|e| ConfigError::Parse(e))?;
+        let config: AppConfig = serde_json::from_str(content).map_err(|e| ConfigError::Parse(e))?;
         Ok(config)
     }
 
@@ -78,6 +83,12 @@ impl AppConfig {
     /// joining the runtime data directory with the configured `db_file` name.
     pub fn cache_db_path(&self) -> Option<std::path::PathBuf> {
         self.data_path().map(|p| p.join(&self.cache.db_file))
+    }
+
+    /// Returns the full path to the favorites database file,
+    /// joining the runtime data directory with [`FAVORITES_DB_FILE`].
+    pub fn favorites_db_path(&self) -> Option<std::path::PathBuf> {
+        self.data_path().map(|p| p.join(FAVORITES_DB_FILE))
     }
 }
 

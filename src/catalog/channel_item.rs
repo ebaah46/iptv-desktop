@@ -1,6 +1,6 @@
 use libcore::domain::{Channel, Logo};
 use qtbridge::QModelItem;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// A channel together with its associated logo, as consumed by the UI layer.
@@ -13,22 +13,22 @@ pub struct ChannelItem {
     channel: Option<Arc<Channel>>,
     logo: Option<Arc<Logo>>,
     has_logo: bool,
+    is_favorite: bool,
 }
 
 impl ChannelItem {
-    /// Builds a channel item from the domain channel and its logo.
-    pub fn new(channel: Arc<Channel>, logo: Arc<Logo>) -> Self {
-        Self::from_parts(channel, Some(logo))
-    }
-
     /// Pairs every channel with its logo (when one exists) in `O(channels + logos)`.
     ///
     /// Logos are indexed by channel id once, so each channel costs a single
     /// hash lookup instead of a nested scan. Channels without a matching logo
     /// are still included, with `logo: None` and `has_logo == false`.
+    ///
+    /// `favorite_ids` is used only to populate the cached `is_favorite` flag;
+    /// the set is not retained by the item.
     pub fn from_channels(
         channels: impl IntoIterator<Item = Arc<Channel>>,
         logos: &[Arc<Logo>],
+        favorite_ids: &HashSet<&str>,
     ) -> Vec<Self> {
         let mut logo_by_channel: HashMap<&str, &Arc<Logo>> = HashMap::with_capacity(logos.len());
         for logo in logos {
@@ -43,9 +43,10 @@ impl ChannelItem {
 
         for channel in channels {
             let logo = logo_by_channel.get(channel.id.as_str()).copied().cloned();
+            let is_favorite = favorite_ids.contains(channel.id.as_str());
             let item = match logo {
-                Some(logo) => Self::new(channel, logo),
-                None => Self::from_parts(channel, None),
+                Some(logo) => Self::from_parts(channel, Some(logo), is_favorite),
+                None => Self::from_parts(channel, None, is_favorite),
             };
             items.push(item);
         }
@@ -53,13 +54,29 @@ impl ChannelItem {
         items
     }
 
-    fn from_parts(channel: Arc<Channel>, logo: Option<Arc<Logo>>) -> Self {
+    /// The channel id, when the item is backed by a channel.
+    pub fn id(&self) -> Option<&str> {
+        self.channel.as_ref().map(|channel| channel.id.as_str())
+    }
+
+    /// Whether this channel is currently a favorite.
+    pub fn is_favorite(&self) -> bool {
+        self.is_favorite
+    }
+
+    /// Updates the cached favorite state without touching the channel data.
+    pub fn set_favorite(&mut self, is_favorite: bool) {
+        self.is_favorite = is_favorite;
+    }
+
+    fn from_parts(channel: Arc<Channel>, logo: Option<Arc<Logo>>, is_favorite: bool) -> Self {
         let has_logo = logo.as_ref().is_some_and(|logo| !logo.url.is_empty());
 
         Self {
             channel: Some(channel),
             logo,
             has_logo,
+            is_favorite,
         }
     }
 }
@@ -80,7 +97,7 @@ impl QModelItem for ChannelItem {
     type T10 = u32; // logo_width
     type T11 = u32; // logo_height
     type T12 = bool; // has_logo (cached)
-    type T13 = ();
+    type T13 = bool; // is_favorite (cached)
     type T14 = ();
 
     // 2. Zero-allocation getters: return references straight into the Arc<Channel> / Arc<Logo>
@@ -126,8 +143,9 @@ impl QModelItem for ChannelItem {
     }
 
     fn get13(&self) -> Option<&Self::T13> {
-        None
+        Some(&self.is_favorite)
     }
+
     fn get14(&self) -> Option<&Self::T14> {
         None
     }
@@ -149,6 +167,38 @@ impl QModelItem for ChannelItem {
         map.insert(10, "logoWidth".to_string());
         map.insert(11, "logoHeight".to_string());
         map.insert(12, "hasLogo".to_string());
+        map.insert(13, "isFavorite".to_string());
         map
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn channel(id: &str) -> Arc<Channel> {
+        Arc::new(Channel {
+            id: id.to_string(),
+            name: format!("Channel {id}"),
+            alt_names: Vec::new(),
+            category_ids: Vec::new(),
+            country_code: "US".to_string(),
+            is_nsfw: false,
+            launched: None,
+            closed: None,
+            website: String::new(),
+            network: String::new(),
+        })
+    }
+
+    #[test]
+    fn from_channels_marks_favorites() {
+        let favorites: HashSet<&str> = ["b"].into_iter().collect();
+
+        let items = ChannelItem::from_channels(vec![channel("a"), channel("b")], &[], &favorites);
+
+        assert_eq!(items.len(), 2);
+        assert!(!items[0].is_favorite());
+        assert!(items[1].is_favorite());
     }
 }
